@@ -1,0 +1,468 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=0.5in]{geometry}  
+\geometry{a4paper, margin=1in}
+\usepackage{comment} % for comments
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{hyperref}
+\usepackage{graphicx}
+% Required packages for algorithms
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\begin{document}
+
+\section{Introduction to Stochastic Gradient Descent}
+
+\subsection{Problem Setup}
+
+Let $(\mathcal{X} \times \mathcal{Y}, P)$ be a probability space, where $\mathcal{X}$ is the input space and $\mathcal{Y}$ is the output space. We observe a dataset $\mathcal{D}_n = \{(X_i, Y_i)\}_{i=1}^n$ consisting of $n$ i.i.d.\ samples from the distribution $P$.
+
+Consider a parametric model $f: \Theta \times \mathcal{X} \to \mathcal{Y}$, where $\Theta \subseteq \mathbb{R}^d$ is the parameter space. For neural networks, $f(\theta; x)$ represents the network's output given parameters $\theta \in \Theta$ and input $x \in \mathcal{X}$.
+
+\subsection{Loss Functions}
+
+We define a loss function $\ell: \mathcal{Y} \times \mathcal{Y} \to \mathbb{R}_+$ that measures the discrepancy between predictions and targets. For regression tasks, we typically use the squared loss:
+$$\ell(\hat{y}, y) = \frac{1}{2}\|\hat{y} - y\|^2$$
+
+This induces the following hierarchy of loss functions:
+
+\begin{enumerate}
+    \item \textbf{Individual sample loss}: For a single data point $(x, y)$,
+    $$\ell(\theta; x, y) := \ell(f(\theta; x), y)$$
+    
+    \item \textbf{Empirical risk} (finite-sample loss): Over the dataset $\mathcal{D}_n$,
+    $$L_n(\theta) := \frac{1}{n} \sum_{i=1}^n \ell(\theta; X_i, Y_i)$$
+    
+    \item \textbf{Population risk} (expected loss): Over the true distribution $P$,
+    $$L(\theta) := \mathbb{E}_{(X,Y) \sim P}[\ell(\theta; X, Y)]$$
+\end{enumerate}
+
+In practice, we only have access to $L_n(\theta)$ and use it as a proxy for $L(\theta)$, which we truly wish to minimize.
+
+\subsection{Gradients}
+
+Define the gradients with respect to parameters $\theta$:
+
+\begin{enumerate}
+    \item \textbf{Individual gradient}: $g_i(\theta) := \nabla_\theta \ell(\theta; X_i, Y_i)$
+    \item \textbf{Empirical gradient}: $g_n(\theta) := \nabla L_n(\theta) = \frac{1}{n} \sum_{i=1}^n g_i(\theta)$
+    \item \textbf{Stochastic gradient}: For a batch $\mathcal{B} \subset D_n$ of size $B$ sampled uniformly at random,
+    $$g_{\mathcal{B}}(\theta) := \frac{1}{B} \sum_{i \in \mathcal{B}} g_i(\theta)$$
+    \item \textbf{Population gradient}: $g(\theta) := \nabla L(\theta) = \mathbb{E}_{(X,Y) \sim P}[\nabla_\theta \ell(\theta; X, Y)]$
+\end{enumerate}
+
+Note that $\mathbb{E}_{\mathcal{B}}[g_{\mathcal{B}}(\theta)] = \nabla L_n(\theta)$, making the stochastic gradient an unbiased estimator of the empirical gradient.
+
+\subsection{The SGD Algorithm}
+
+\textbf{Stochastic Gradient Descent (SGD)} performs the following iterative update:
+
+\begin{algorithm}
+\caption{Stochastic Gradient Descent}
+\begin{algorithmic}[1]
+\State Initialize $\theta_0 \in \Theta$
+\For{$k = 0, 1, 2, ..., K-1$}
+    \State Sample mini-batch $\mathcal{B}_k \subseteq D_n$ uniformly at random
+    \State Compute stochastic gradient $g_{\mathcal{B}_k}(\theta_k)$
+    \State Update: $\theta_{k+1} = \theta_k - \eta_k g_{\mathcal{B}_k}(\theta_k)$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+where $\eta_k > 0$ is the learning rate (or step size) at iteration $k$.
+
+\subsection{Mini-batch Sampling Strategies}
+
+There are two common sampling strategies:
+
+\begin{enumerate}
+    \item \textbf{With replacement}: Each element of $\mathcal{B}_k$ is drawn independently and uniformly from $\{1, ..., n\}$
+    \item \textbf{Without replacement}: Sample $B$ distinct indices uniformly from $\{1, ..., n\}$
+\end{enumerate}
+
+The with-replacement case is often easier to analyze theoretically due to independence.
+
+\subsection{Decomposition into Drift and Noise}
+
+It is useful to decompose the SGD update as:
+$$\theta_{k+1} = \theta_k - \eta_k g_n(\theta_k) + \eta_k \xi(\theta_k)$$
+where the \textbf{gradient noise} is defined as:
+$$\xi(\theta_k) := g_n(\theta_k) - g_{\mathcal{B}_k}(\theta_k)$$
+This yields a decomposition into:
+\begin{itemize}
+    \item \textbf{Drift}: $\eta_k g_n(\theta_k)$ (deterministic gradient)
+    \item \textbf{Diffusion}: $\eta_k \xi(\theta_k)$ (stochastic perturbation)
+\end{itemize}
+
+\subsection{Special Cases}
+
+\begin{enumerate}
+    \item \textbf{Full-batch gradient descent}: $\mathcal{B}_k = \{1, ..., n\}$, so $\xi_k = 0$ (deterministic)
+    \item \textbf{Single-sample SGD}: $|\mathcal{B}_k| = 1$, maximum noise
+    \item \textbf{Constant learning rate}: $\eta_k = \eta$ for all $k$
+    \item \textbf{Decaying learning rate}: $\eta_k \to 0$ as $k \to \infty$ (e.g., $\eta_k = \eta_0/\sqrt{k+1}$)
+\end{enumerate}
+
+```latex
+\subsection{Properties of the Gradient Noise}
+
+The stochasticity in SGD arises from two distinct sources of randomness, which we now analyze.
+
+\subsubsection{Two Sources of Gradient Noise}
+
+\textbf{1. Sampling Noise (Empirical vs.\ Population)}
+
+The first source of randomness comes from using a finite dataset. Even if we compute the full empirical gradient $g_n(\theta)$, it differs from the true population gradient $g(\theta)$:
+$$\nu_{\text{sampling}}(\theta) := g_n(\theta) - g(\theta) = \frac{1}{n} \sum_{i=1}^n g_i(\theta) - \mathbb{E}_{(X,Y) \sim P}[\nabla_\theta \ell(\theta; X, Y)]$$
+
+Since the data points are i.i.d.\ samples from $P$, we have:
+\begin{align}
+\mathbb{E}_{\mathcal{D}_n}[\nu_{\text{sampling}}(\theta)] &= \mathbb{E}_{\mathcal{D}_n}\left[\frac{1}{n} \sum_{i=1}^n g_i(\theta)\right] - g(\theta) = 0
+\end{align}
+
+The covariance is:
+\begin{align}
+\text{Cov}_{\mathcal{D}_n}[\nu_{\text{sampling}}(\theta)] &= \text{Cov}_{\mathcal{D}_n}\left[\frac{1}{n} \sum_{i=1}^n g_i(\theta)\right] \\
+&= \frac{1}{n^2} \sum_{i=1}^n \text{Cov}_{(X_i,Y_i)}[g_i(\theta)] \\
+&= \frac{1}{n} \Sigma_{\text{pop}}(\theta)
+\end{align}
+
+where $\Sigma_{\text{pop}}(\theta) := \text{Cov}_{(X,Y) \sim P}[\nabla_\theta \ell(\theta; X, Y)]$ is the population gradient covariance.
+
+\textbf{2. Mini-batch Noise (Empirical vs.\ Batch)}
+
+The second source of randomness comes from using mini-batches instead of the full dataset:
+$$\nu_{\text{batch}}(\theta) := g_{\mathcal{B}}(\theta) - g_n(\theta) = \frac{1}{B} \sum_{i \in \mathcal{B}} g_i(\theta) - \frac{1}{n} \sum_{i=1}^n g_i(\theta)$$
+
+For uniform sampling with replacement, conditioning on the dataset $\mathcal{D}_n$:
+\begin{align}
+\mathbb{E}_{\mathcal{B}}[\nu_{\text{batch}}(\theta) | \mathcal{D}_n] &= \mathbb{E}_{\mathcal{B}}\left[\frac{1}{B} \sum_{i \in \mathcal{B}} g_i(\theta)\right] - g_n(\theta) = 0
+\end{align}
+
+The conditional covariance is:
+\begin{align}
+\text{Cov}_{\mathcal{B}}[\nu_{\text{batch}}(\theta) | \mathcal{D}_n] &= \text{Cov}_{\mathcal{B}}\left[\frac{1}{B} \sum_{i \in \mathcal{B}} g_i(\theta) \bigg| \mathcal{D}_n\right] \\
+&= \frac{1}{B} \Sigma_{\text{emp}}(\theta, \mathcal{D}_n)
+\end{align}
+
+where $\Sigma_{\text{emp}}(\theta, \mathcal{D}_n) := \frac{1}{n} \sum_{i=1}^n [g_i(\theta) - g_n(\theta)][g_i(\theta) - g_n(\theta)]^T$ is the empirical gradient covariance.
+
+\subsubsection{Total Gradient Noise}
+
+The total noise in SGD is:
+$$\xi_{\text{total}}(\theta) := g_{\mathcal{B}}(\theta) - g(\theta) = \underbrace{g_{\mathcal{B}}(\theta) - g_n(\theta)}_{\nu_{\text{batch}}(\theta)} + \underbrace{g_n(\theta) - g(\theta)}_{\nu_{\text{sampling}}(\theta)}$$
+
+However, in the SGD algorithm as defined, we use:
+$$\xi(\theta) := g_n(\theta) - g_{\mathcal{B}}(\theta) = -\nu_{\text{batch}}(\theta)$$
+
+This is because we can only compute deviations from the empirical gradient, not the unknown population gradient.
+
+\subsubsection{Covariance Structure of SGD Noise}
+
+For the noise $\xi(\theta) = g_n(\theta) - g_{\mathcal{B}}(\theta)$ used in SGD:
+
+\textbf{Proposition 1.} \textit{Under uniform mini-batch sampling with replacement, the gradient noise has the following properties:}
+
+\begin{enumerate}
+    \item \textbf{Unbiasedness}: $\mathbb{E}_{\mathcal{B}}[\xi(\theta) | \mathcal{D}_n, \theta] = 0$
+    
+    \item \textbf{Covariance}: 
+    $$\text{Cov}_{\mathcal{B}}[\xi(\theta) | \mathcal{D}_n, \theta] = \frac{1}{B} \Sigma_{\text{emp}}(\theta, \mathcal{D}_n)$$
+    
+    \item \textbf{Expected Covariance}: Taking expectation over datasets,
+    $$\mathbb{E}_{\mathcal{D}_n}[\text{Cov}_{\mathcal{B}}[\xi(\theta) | \mathcal{D}_n, \theta]] = \frac{1}{B} \cdot \frac{n-1}{n} \Sigma_{\text{pop}}(\theta)$$
+\end{enumerate}
+
+\textit{Proof.} 
+\begin{enumerate}
+    \item Follows immediately from $\mathbb{E}_{\mathcal{B}}[g_{\mathcal{B}}(\theta)] = g_n(\theta)$.
+    
+    \item For sampling with replacement:
+    \begin{align}
+    \text{Cov}_{\mathcal{B}}[\xi(\theta) | \mathcal{D}_n] &= \text{Cov}_{\mathcal{B}}[g_{\mathcal{B}}(\theta) | \mathcal{D}_n] \\
+    &= \text{Var}_{\mathcal{B}}\left[\frac{1}{B} \sum_{j=1}^B g_{I_j}(\theta) \bigg| \mathcal{D}_n\right]
+    \end{align}
+    where $I_j$ are i.i.d.\ uniform on $\{1, ..., n\}$. Since the $I_j$ are independent:
+    \begin{align}
+    &= \frac{1}{B^2} \sum_{j=1}^B \text{Var}_{I_j}[g_{I_j}(\theta) | \mathcal{D}_n] \\
+    &= \frac{1}{B} \cdot \frac{1}{n} \sum_{i=1}^n [g_i(\theta) - g_n(\theta)][g_i(\theta) - g_n(\theta)]^T
+    \end{align}
+    
+    \item Using the identity $\mathbb{E}[\Sigma_{\text{emp}}] = \frac{n-1}{n} \Sigma_{\text{pop}}$ completes the proof.
+\end{enumerate}
+
+\subsubsection{Key Observations}
+
+\begin{enumerate}
+    \item \textbf{Batch size scaling}: The noise covariance scales inversely with batch size $B$. Larger batches reduce noise.
+    
+    \item \textbf{Position dependence}: The covariance $\Sigma_{\text{emp}}(\theta, \mathcal{D}_n)$ depends on the current parameters $\theta$, making the noise \textit{multiplicative} rather than additive.
+    
+    \item \textbf{Finite sample correction}: The factor $\frac{n-1}{n}$ in the expected covariance reflects the finite dataset size. As $n \to \infty$, we recover $\mathbb{E}[\text{Cov}[\xi]] = \frac{1}{B} \Sigma_{\text{pop}}(\theta)$.
+    
+    \item \textbf{Sampling without replacement}: If we sample without replacement, the covariance becomes:
+    $$\text{Cov}_{\mathcal{B}}[\xi(\theta) | \mathcal{D}_n] = \frac{n-B}{n-1} \cdot \frac{1}{B} \Sigma_{\text{emp}}(\theta, \mathcal{D}_n)$$
+    The factor $\frac{n-B}{n-1}$ represents the finite population correction.
+\end{enumerate}
+
+\subsubsection{Estimating the Noise Covariance}
+
+In practice, we can estimate $\Sigma_{\text{emp}}(\theta, \mathcal{D}_n)$ by:
+\begin{enumerate}
+    \item Computing multiple stochastic gradients $\{g_{\mathcal{B}_j}(\theta)\}_{j=1}^m$ at the same $\theta$
+    \item Estimating: $\hat{\Sigma} = \frac{B}{m-1} \sum_{j=1}^m [g_{\mathcal{B}_j}(\theta) - \bar{g}][g_{\mathcal{B}_j}(\theta) - \bar{g}]^T$
+\end{enumerate}
+
+where $\bar{g} = \frac{1}{m} \sum_{j=1}^m g_{\mathcal{B}_j}(\theta)$.
+
+This characterization of gradient noise is fundamental for understanding the continuous-time limit of SGD, as the noise covariance $\Sigma(\theta)$ directly determines the diffusion coefficient in the limiting stochastic differential equation.
+
+\section{Continuous-time limit of SGD}
+
+\subsection{Heuristic derivation of the continuous-time limit}
+Consider the SGG update:
+\begin{align}
+\theta_{k+1} = \theta_k - \eta_k g_{\mathcal{B}_k}(\theta_k)
+\end{align}
+where $g_{\mathcal{B}_k}(\theta_k)$ is the gradient at the $k$-th iteration for batch $\mathcal{B}_k$.
+Define the gradient noise as:
+\begin{align}
+\xi(\theta_k) := g_n(\theta_k) - g_{\mathcal{B}_k}(\theta_k)
+\end{align}
+where $g_n(\theta_k)$ is the empirical gradient.
+The new update can be written as:
+\begin{align}
+\Delta\theta_{k+1} := \theta_{k+1} - \theta_k = - \eta_k g_{\mathcal{B}_k}(\theta_k) + \eta_k \xi(\theta_k)
+\end{align}
+The 1-sample gradient expectation is:
+\begin{align}
+\mathbb{E}[g_i(\theta_k)] = \frac{1}{n} \sum_{i=1}^n g_i(\theta_k) = g_n(\theta_k)
+\end{align}
+Hence the expectation of the noise is zero.
+The 1-sample noise covariance is:
+\begin{align}
+\Sigma(\theta_k) := \frac{1}{n} \sum_{i=1}^n [g_i(\theta_k) - g_n(\theta_k)][g_i(\theta_k) - g_n(\theta_k)]^T
+\end{align}
+where $g_i(\theta_k)$ is the gradient at the $i$-th data point. The batch noise covariance is:
+\begin{align}
+\Sigma_{\text{batch}}(\theta_k) := \frac{1}{B^2}\sum_{i\in\mathcal{B}_k} Cov(\xi(\theta_k)) = \frac{1}{B}\Sigma(\theta_k)
+\end{align}
+Assume that the learning rate is independent of $k$. Assume that batch size is large enough to apply CLT and much smaller than the dataset size i.e. $B \ll n$ (\textbf{independent batches?}) and $\frac{B}{n} \ll 1$. Assume that number of samples is large enough to apply CLT. Assume that samples are i.i.d. and that the gradient update (and maybe gradient noise?) have finite variance. Under these assumptions, we can apply the CLT to the batch gradient and get:
+\begin{align}
+\xi(\theta_k) \sim \mathcal{N}(0, \frac{1}{B}\Sigma(\theta_k))
+\end{align}
+Proper scaling of the noise is crucial to apply CLT and get the continuous-time limit.
+Physical intuition: the average displacement of the noise is 0 but the the typical displacement of the noise is in $\sqrt{t}$ where $t = N\eta$ for $N$ steps.
+More specifically
+\begin{align}
+Var(\sum_{k=1}^N \eta \xi_k) & = N\eta^2\Sigma(\theta_k) = t\eta\Sigma(\theta_k)\\
+std( \sum_{k=1}^N \eta \xi_k) & = \sqrt{t\eta}\sqrt{\Sigma(\theta_k)}
+\end{align}
+with $N = \frac{t}{\eta}$ for N steps. We see that as $\eta \to 0$, the typical displacement of the accumulated noise goes to 0.
+If we use the scaling $\sqrt(\eta)$ for the noise, we get:
+\begin{align}
+Var(\sum_{k=1}^N \sqrt(\eta) \xi_k) & = N\eta\Sigma(\theta_k) = t\Sigma(\theta_k)\\
+std( \sum_{k=1}^N \sqrt(\eta) \xi_k) & = \sqrt{t}\sqrt{\Sigma(\theta_k)}
+\end{align}
+With $N= t/\eta$ for N steps. We see that the noise as proper scaling as the typical displacement is in $\sqrt{t}$ and does not depends on $\eta$.
+The continuous-time limit of SGD is:
+\begin{align}
+d\theta_t = - \nabla L_n(\theta_t) dt + \sqrt{\frac{\eta}{B}\Sigma(\theta_t)} dW_t
+\end{align}
+where $W_t$ is a Wiener process. Note that a more rigorourous derivation would use the Lindeberg condition and the Donsker's theorem.
+\subsection{Key assumptions}
+
+\begin{itemize}
+    \item Gradient noise has finite variance
+    \item $\eta_k$ is independent of $k$
+    \item $\eta \to dt$
+    \item $B \ll n$ and $\frac{B}{n} \ll 1$
+    \item No auto-correlation in the noise
+    \item Samples are i.i.d.
+    \item For now we are not considering momentum.
+    \item This contrasts with Adam which has a momentum and a second order correction of past gradient.
+\end{itemize}
+
+\subsection{Why do we care: the tempered posterior distribution}
+Using the machinery of Fokker-Planck equation, we can derive the stationary distribution of the SGD process as the tempered posterior distribution. The Fokker-Planck equation is:
+\begin{align}
+\frac{\partial p(\theta, t)}{\partial t} = \nabla \cdot \left( 
+    \nabla L_N(\theta) p(\theta, t) + \frac{1}{2} \frac{\eta}{B} \Sigma(\theta) \nabla p(\theta, t) \right)
+\end{align}
+Assume that the noise covariance matrix is positive definite. Let the probability current be:
+\begin{align}
+j(\theta, t) = \nabla L_N(\theta) p(\theta, t) + \frac{1}{2} \frac{\eta}{B} \Sigma(\theta) \nabla p(\theta, t)
+\end{align}
+The stationarity condition implies that the probability current is divergence free:
+\begin{align}
+\nabla \cdot j(\theta, t) = 0
+\end{align}
+Assume a detailed balance condition i.e. $j(\theta, t) = 0$. This implies that the stationary distribution satisfies:
+\begin{align}
+\nabla L_N(\theta) p(\theta) + \frac{1}{2} \frac{\eta}{B} \Sigma(\theta) \nabla p(\theta) = 0
+\end{align}
+Assume that the noise covariance matrix is constant $\Sigma(\theta) = \Sigma$, positive and definite. Then solving the latter differential equation gives us the stationary distribution as the tempered posterior distribution:
+\begin{align}
+p_{\infty}(\theta) = \frac{1}{Z} \exp\left(-\beta \Sigma^{-1} L_{N}(\theta)\right)
+\end{align}
+where $\beta = \frac{B}{2\eta}$ is the inverse temperature.
+In the case where the noise covariance matrix is not constant but still positive and definite, we get:
+\begin{align}
+p_{\infty}(\theta) = \frac{1}{Z}|\Sigma(\theta)|^{-1/2}\exp\left(-\frac{2B}{\eta} L_{N}(\theta)\right)
+\end{align}
+where $Z$ is the partition function. In that case, the stationary distribution is given by the tempered posterior i.e. up to the temperature parameter SGD is similar to Bayesian inference. This result is been investigated in more details by Mandt. The assumptions in this derivation are not realistic since the noise covariance is singular i.e. not definite positive. In fact, deep neural networks are highly degenerate and we also know that SGD favour flat minima. 
+\subsection{Why do we care: the tempered posterior distribution}
+
+
+
+\section{\textbf{TODO}}
+\begin{itemize}
+    \item Explain why we care about continuous-time limit and connection with the tempered posterior distribution (also mention invertability of the noise covariance)
+    \item Have a better understanding of the detailed balance condition and links with the curl of the probability current (leading to a non stationary distribution but to an orbit instead)
+    \item Check proof of stationary distribution for the case where the noise covariance is not constant.
+    \item Explain connection with SLT and spectrum between continuous limit with all assumptions and discrete SGD
+    \item Include momentum considerations.
+\end{itemize}
+\section{Appendix}
+
+\subsubsection{Detailed Derivation of Batch Noise Covariance}
+
+Let's carefully work through the derivation of the batch noise covariance, addressing why we condition on the dataset.
+
+\textbf{Why Condition on the Dataset?}
+
+In SGD, there are two layers of randomness:
+\begin{enumerate}
+    \item \textbf{Dataset randomness}: The dataset $\mathcal{D}_n = \{(X_i, Y_i)\}_{i=1}^n$ consists of random samples from the population
+    \item \textbf{Mini-batch randomness}: Given a fixed dataset, we randomly select mini-batches
+\end{enumerate}
+
+When analyzing a single SGD step, the dataset is already fixed—it's the data we have. The only randomness at each iteration comes from mini-batch selection. This is why we condition on $\mathcal{D}_n$.
+
+\textbf{Setting up the Problem}
+
+Fix a dataset $\mathcal{D}_n$. For this fixed dataset, we have:
+\begin{itemize}
+    \item Individual gradients: $g_i(\theta) = \nabla_\theta \ell(\theta; X_i, Y_i)$ (these are now \textit{fixed} functions of $\theta$)
+    \item Empirical gradient: $g_n(\theta) = \frac{1}{n} \sum_{i=1}^n g_i(\theta)$ (also fixed)
+\end{itemize}
+
+The mini-batch gradient for a random batch $\mathcal{B}$ is:
+$$g_{\mathcal{B}}(\theta) = \frac{1}{B} \sum_{i \in \mathcal{B}} g_i(\theta)$$
+
+The batch noise is:
+$$\nu_{\text{batch}}(\theta) = g_{\mathcal{B}}(\theta) - g_n(\theta)$$
+
+\textbf{Computing the Conditional Expectation}
+
+For sampling with replacement, each index in $\mathcal{B}$ is drawn independently and uniformly from $\{1, ..., n\}$. Let's denote these random indices as $I_1, ..., I_B$.
+
+\begin{align}
+\mathbb{E}_{\mathcal{B}}[\nu_{\text{batch}}(\theta) | \mathcal{D}_n] &= \mathbb{E}_{\mathcal{B}}[g_{\mathcal{B}}(\theta) - g_n(\theta) | \mathcal{D}_n] \\
+&= \mathbb{E}_{\mathcal{B}}[g_{\mathcal{B}}(\theta) | \mathcal{D}_n] - g_n(\theta) \\
+&= \mathbb{E}_{I_1,...,I_B}\left[\frac{1}{B} \sum_{j=1}^B g_{I_j}(\theta) \bigg| \mathcal{D}_n\right] - g_n(\theta)
+\end{align}
+
+Since each $I_j$ is uniformly distributed on $\{1, ..., n\}$:
+\begin{align}
+\mathbb{E}_{I_j}[g_{I_j}(\theta) | \mathcal{D}_n] &= \sum_{i=1}^n \mathbb{P}(I_j = i) \cdot g_i(\theta) \\
+&= \sum_{i=1}^n \frac{1}{n} \cdot g_i(\theta) \\
+&= \frac{1}{n} \sum_{i=1}^n g_i(\theta) = g_n(\theta)
+\end{align}
+
+Therefore:
+\begin{align}
+\mathbb{E}_{\mathcal{B}}[\nu_{\text{batch}}(\theta) | \mathcal{D}_n] &= \frac{1}{B} \sum_{j=1}^B \mathbb{E}_{I_j}[g_{I_j}(\theta) | \mathcal{D}_n] - g_n(\theta) \\
+&= \frac{1}{B} \sum_{j=1}^B g_n(\theta) - g_n(\theta) \\
+&= g_n(\theta) - g_n(\theta) = 0
+\end{align}
+
+\textbf{Computing the Conditional Covariance}
+
+Now for the covariance. Since $\mathbb{E}[\nu_{\text{batch}}] = 0$:
+\begin{align}
+\text{Cov}_{\mathcal{B}}[\nu_{\text{batch}}(\theta) | \mathcal{D}_n] &= \mathbb{E}_{\mathcal{B}}[\nu_{\text{batch}}(\theta) \nu_{\text{batch}}(\theta)^T | \mathcal{D}_n]
+\end{align}
+
+We have:
+\begin{align}
+\nu_{\text{batch}}(\theta) &= g_{\mathcal{B}}(\theta) - g_n(\theta) \\
+&= \frac{1}{B} \sum_{j=1}^B g_{I_j}(\theta) - g_n(\theta) \\
+&= \frac{1}{B} \sum_{j=1}^B [g_{I_j}(\theta) - g_n(\theta)]
+\end{align}
+
+Therefore:
+\begin{align}
+\text{Cov}_{\mathcal{B}}[\nu_{\text{batch}} | \mathcal{D}_n] &= \mathbb{E}_{\mathcal{B}}\left[\left(\frac{1}{B} \sum_{j=1}^B [g_{I_j}(\theta) - g_n(\theta)]\right)\left(\frac{1}{B} \sum_{k=1}^B [g_{I_k}(\theta) - g_n(\theta)]\right)^T \bigg| \mathcal{D}_n\right]
+\end{align}
+
+Expanding:
+\begin{align}
+&= \frac{1}{B^2} \sum_{j=1}^B \sum_{k=1}^B \mathbb{E}_{I_j,I_k}\left[[g_{I_j}(\theta) - g_n(\theta)][g_{I_k}(\theta) - g_n(\theta)]^T | \mathcal{D}_n\right]
+\end{align}
+
+For sampling with replacement, $I_j$ and $I_k$ are independent when $j \neq k$. For $j \neq k$:
+\begin{align}
+&\mathbb{E}_{I_j,I_k}[[g_{I_j}(\theta) - g_n(\theta)][g_{I_k}(\theta) - g_n(\theta)]^T | \mathcal{D}_n] \\
+&= \mathbb{E}_{I_j}[g_{I_j}(\theta) - g_n(\theta) | \mathcal{D}_n] \cdot \mathbb{E}_{I_k}[g_{I_k}(\theta) - g_n(\theta) | \mathcal{D}_n]^T \\
+&= 0 \cdot 0^T = 0
+\end{align}
+
+For $j = k$:
+\begin{align}
+&\mathbb{E}_{I_j}[[g_{I_j}(\theta) - g_n(\theta)][g_{I_j}(\theta) - g_n(\theta)]^T | \mathcal{D}_n] \\
+&= \sum_{i=1}^n \mathbb{P}(I_j = i) \cdot [g_i(\theta) - g_n(\theta)][g_i(\theta) - g_n(\theta)]^T \\
+&= \frac{1}{n} \sum_{i=1}^n [g_i(\theta) - g_n(\theta)][g_i(\theta) - g_n(\theta)]^T \\
+&= \Sigma_{\text{emp}}(\theta, \mathcal{D}_n)
+\end{align}
+
+Therefore:
+\begin{align}
+\text{Cov}_{\mathcal{B}}[\nu_{\text{batch}} | \mathcal{D}_n] &= \frac{1}{B^2} \sum_{j=1}^B \Sigma_{\text{emp}}(\theta, \mathcal{D}_n) \\
+&= \frac{1}{B^2} \cdot B \cdot \Sigma_{\text{emp}}(\theta, \mathcal{D}_n) \\
+&= \frac{1}{B} \Sigma_{\text{emp}}(\theta, \mathcal{D}_n)
+\end{align}
+
+\textbf{Key Insight}
+
+The factor $\frac{1}{B}$ arises because:
+\begin{itemize}
+    \item We average $B$ independent random variables (the gradients at randomly selected indices)
+    \item Each has the same variance $\Sigma_{\text{emp}}$
+    \item The variance of an average of $B$ i.i.d. random variables is $\frac{1}{B}$ times the individual variance
+\end{itemize}
+
+This is why larger batch sizes reduce gradient noise—the noise variance decreases as $O(1/B)$.
+
+\subsection{Stationary distribution when the noise covariance is not constant}
+\section{Claude questions}
+
+Consider the SGD update:
+\begin{align}
+\theta_{k+1} = \theta_k - \eta_k g_{\mathcal{B}_k}(\theta_k)
+\end{align}
+where $g_{\mathcal{B}_k}(\theta_k)$ is the gradient at the $k$-th iteration for batch $\mathcal{B}_k$.
+Define the gradient noise as:
+\begin{align}
+\xi(\theta_k) := g_n(\theta_k) - g_{\mathcal{B}_k}(\theta_k)
+\end{align}
+where $g_n(\theta_k)$ is the empirical gradient.
+What are the conditions on $n$ and $B$ to apply the central limit theorem to the gradient noise?
+\begin{itemize}
+    \item B should remain fixed as the learning rate $\eta \to 0$
+    \item Typically $B \ll n$ (batch size much smaller than dataset size)
+\end{itemize}
+The batch size should NOT scale with $1/\eta$
+$1/\eta$
+The gradient noise must have finite second moments:
+$\mathbb{E}[\|\xi(\theta_k)\|^2 | \theta_k] < \infty$
+For mini-batch sampling with replacement, the covariance is:
+$\text{Cov}[\xi(\theta_k) | \theta_k] = \frac{1}{B} \cdot \frac{n-B}{n-1} \cdot \text{Cov}_{i \sim \text{Uniform}(1,n)}[\nabla L(\theta_k; X_i)]$
+This requires individual gradients to have finite variance.
+If sampling with replacement: No additional constraints beyond finite variance
+If sampling without replacement: Need $B/n \ll 1$
+$B/n \ll 1$ so that dependencies between batches are negligible
+\end{document}
