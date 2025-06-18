@@ -1,0 +1,1 @@
+These are notes about my research on the inductive biases of SGD.
