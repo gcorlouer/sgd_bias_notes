@@ -11,6 +11,7 @@
 % Required packages for algorithms
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage[normalem]{ulem}
 
 \begin{document}
 
@@ -273,19 +274,6 @@ The continuous-time limit of SGD is:
 d\theta_t = - \nabla L_n(\theta_t) dt + \sqrt{\frac{\eta}{B}\Sigma(\theta_t)} dW_t
 \end{align}
 where $W_t$ is a Wiener process. Note that a more rigorourous derivation would use the Lindeberg condition and the Donsker's theorem.
-\subsection{Key assumptions}
-
-\begin{itemize}
-    \item Gradient noise has finite variance
-    \item $\eta_k$ is independent of $k$
-    \item $\eta \to dt$
-    \item $B \ll n$ and $\frac{B}{n} \ll 1$
-    \item No auto-correlation in the noise
-    \item Samples are i.i.d.
-    \item For now we are not considering momentum.
-    \item This contrasts with Adam which has a momentum and a second order correction of past gradient.
-\end{itemize}
-
 \subsection{Why do we care: the tempered posterior distribution}
 Using the machinery of Fokker-Planck equation, we can derive the stationary distribution of the SGD process as the tempered posterior distribution. The Fokker-Planck equation is:
 \begin{align}
@@ -314,14 +302,46 @@ In the case where the noise covariance matrix is not constant but still positive
 p_{\infty}(\theta) = \frac{1}{Z}|\Sigma(\theta)|^{-1/2}\exp\left(-\frac{2B}{\eta} L_{N}(\theta)\right)
 \end{align}
 where $Z$ is the partition function. In that case, the stationary distribution is given by the tempered posterior i.e. up to the temperature parameter SGD is similar to Bayesian inference. This result is been investigated in more details by Mandt. The assumptions in this derivation are not realistic since the noise covariance is singular i.e. not definite positive. In fact, deep neural networks are highly degenerate and we also know that SGD favour flat minima. 
-\subsection{Why do we care: the tempered posterior distribution}
+\subsection{List of assumptions}
 
+Assumptions for the continuous-time limit of SGD:
+\begin{itemize}
+    \item GN satisfies the Lindeberg condition: necessary for CLT to apply. Unclear how much this matters.
+    \item Gradient noise has finite variance: necessary for CLT to apply. An alternative would be to consider heavy tailed noise. It is unclear how much this matters. This is debated in the literature and it would be useful to understand better how much this matters by reviewing the literature.
+    \item $\eta_k$ is independent of $k$: Uncertain but technically should not be necessary as we could have $\eta_k \to dt$ after some updates and then take the continuous-time limit if we only care about the local behaviour of SGD. Unclear how much this matters, in practice it is fairly common to have time-varying learning rate. 
+    \item $\eta \to dt \ll 1$: makes the learning rate small which is central to take the continuous-time limit. This is an important difference with the practical usage of SGD. Although it might be possible to approximate the discrete time dynamics with a continuous time dynamics by using a central flows which essentially add the average jittered caused by the discrete learning rate to the continuous time dynamics. See for example this paper: \href{https://arxiv.org/abs/2410.24206}{Understanding Optimization in Deep Learning with Central Flows
+    }.
+    \item $B \ll n$ and $\frac{B}{n} \ll 1$: Have enough batch and data samples to apply CLT
+    \item No auto-correlation in the noise: makes the noise white which enables to take the continuous-time limit. Alternative is having coloured noise. This could happens for example if the batches are not independent, which could be the case, intuitively if the batches, are large. Another example is if the sampling of the batches is not without replacement. In this case it seems that the noise is anti-correlated as argued in this \href{https://openreview.net/forum?id=1QTFfyUePA&noteId=1QTFfyUePA}{paper}. Anti-correlation could be important to generalization as the latter paper argue that it biases SGD further towards flat minima. Momentum can also introduces auto-correlation in the noise. If the noise has some auto-correlation but decaying with time, the functional CLT still can be applied and we can get to the continuous-time with a Wiener process. If not we have to consider a fractional Brownian motion. \textbf{Idea}: Could we have a fractional Levy process with heavy tail noise and long-range auto-correlation? Is it the case that in practice long-range auto-correlation matter? \textbf{Note}: Fractional Brownnian or Levy process could be another connection with fractality in the training process.
+    \textbf{Question}: if heavy tailed noise is considered, does it make sense to consider auto-correlation in the noise?
+    \item Samples are i.i.d.: necessary for CLT to apply
+    \item For now we are not considering momentum. Unsure how it changes the analysis. For example our analysis contrasts with Adam which has a momentum and a second order correction of past gradient.
+\end{itemize}
+Assumptions for the stationary distribution of SGD being the tempered posterior distribution:
+\begin{itemize}
+    \item The noise covariance matrix is positive and definite: seems important to solve the Fokker-Planck equation as we invert the noise covariance matrix to get the stationary distribution. This assumption is violated in practice since deep neural networks are highly degenerate.
+    \item The noise covariance matrix is constant: this is not necessary but makes the calculation easier.
+    \item Detailed balance condition: helps with getting a first ODE for the stationary distribution which enables to get the tempered posterior distribution.
+    \item According to the Helmoltz decomposition, the current can be decomposed into a curl-free part and a divergence-free part. If the noise is anistoropic then we have $\nabla \times j(\theta, t) \neq 0$ In other words, the current is not curl-free. The detailed balanced condition does not hold in that condition. When the diffusion matrix $\Sigma(\theta)$ depends on $\theta$, the stationary dynamics of SGD is an \emph{out-of-equilibrium} steady state with a non-zero \emph{solenoidal probability current}. Probability circulates in parameter space rather than remaining static, so detailed balance—and the simple Boltzmann form $p \propto e^{-\beta L_N}$—no longer hold. \textbf{Note}: I am still a bit confused about the physical intuition about this. How should i think about this probability mass orbiting along some level set of the loss?
+\end{itemize}
 
+\subsection{Ranking assumptions}
+After a deep research with chatGPT \href{https://chatgpt.com/s/dr_6853372e8bf48191913b0ad54514ca1b}{here} here is my updated ranking:
+\begin{itemize}
+    \item Application of CLT from assuming gaussian gradient noise (finite variance in particular, likely that noise is not gaussian but Levy)
+    \item Detailed balance condition from constant noise covariance. In particular this means we must consider a curl component to the probability current.
+    \item \textbf{Note}: I am a bit confused about the ranking of the next two items.
+    \item Small learning rate: irrealistic but see central flows paper.
+    \item No auto-correlation in the noise: this will be violated with momentum in practice (but maybe that's ok as long as it's not long-range auto-correlation?) \textbf{Note}: I am a bit confused about this one. I'd like to understand better violation of long-range auto-correlation. Modification might include: fractional Levy, generalized Langevin dynamics, etc. Need colored noise moodels with memory. Sampling without replacement is common introducing some auto-correlation.
+    \item Batch size large enough but small compared with the dataset size seems realistic especially in large scale training.
+\end{itemize}
 
 \section{\textbf{TODO}}
 \begin{itemize}
-    \item Explain why we care about continuous-time limit and connection with the tempered posterior distribution (also mention invertability of the noise covariance)
-    \item Have a better understanding of the detailed balance condition and links with the curl of the probability current (leading to a non stationary distribution but to an orbit instead)
+    \item \sout{Explain why we care about continuous-time limit and connection with the tempered posterior distribution (also mention invertability of the noise covariance)}
+    \item \sout{Have a better understanding of the detailed balance condition and links with the curl of the probability current (leading to a non stationary distribution but to an orbit instead)}
+    \item Explain the rigorous mathematical derivation of the continuous-time limit of SGD.
+    \item Clarify the importance of assuming finite learning rate. 
     \item Check proof of stationary distribution for the case where the noise covariance is not constant.
     \item Explain connection with SLT and spectrum between continuous limit with all assumptions and discrete SGD
     \item Include momentum considerations.
@@ -437,7 +457,55 @@ The factor $\frac{1}{B}$ arises because:
 
 This is why larger batch sizes reduce gradient noise—the noise variance decreases as $O(1/B)$.
 
-\subsection{Stationary distribution when the noise covariance is not constant}
+\subsection{Helmoltz decomposition of probability current}
+
+The probability current can be decomposed into a curl-free part and a divergence-free part.
+\begin{align}
+j(\theta, t) = j_{\text{curl}}(\theta, t) + j_{\text{div}}(\theta, t)
+\end{align}
+Consider the expression of the probability current:
+\begin{align}
+j(\theta, t) = \nabla L_N(\theta) p(\theta, t) + \frac{1}{2} \frac{\eta}{B} \Sigma(\theta) \nabla p(\theta, t)
+\end{align}
+Let's compute the curl of the probability current:
+% Probability current
+\[
+j_i(\theta,t)=p(\theta,t)\,\partial_i L_N(\theta)\;+\;
+\frac{\eta}{2B}\,\Sigma_{ij}(\theta)\,\partial_j p(\theta,t),
+\qquad i=1,\dots,d .
+\]
+
+% Curl in 3-vector form (for d=3; in higher dimensions use the antisymmetric part of ∂_i j_j)
+\begin{align}
+(\nabla\times j)_k
+    &=\varepsilon_{klm}\,\partial_l j_m \\[4pt]
+    &=\varepsilon_{klm}\,
+      \partial_l\!\Bigl[p\,\partial_m L_N\Bigr]
+      +\frac{\eta}{2B}\,
+       \varepsilon_{klm}\,
+       \partial_l\!\Bigl[\Sigma_{mj}\,\partial_j p\Bigr] \\[4pt]
+    &=\varepsilon_{klm}\,(\partial_l p)\,(\partial_m L_N)
+      +\frac{\eta}{2B}\,
+       \varepsilon_{klm}\,
+       (\partial_l\Sigma_{mj})\,(\partial_j p) \\[4pt]
+    &=\bigl(\nabla p \times \nabla L_N\bigr)_k
+      +\frac{\eta}{2B}\;
+       \bigl[(\nabla\Sigma)\times\nabla p\bigr]_k ,
+\end{align}
+
+where  
+\(
+\displaystyle
+\bigl[(\nabla\Sigma)\times\nabla p\bigr]_k
+      :=\varepsilon_{klm}\,(\partial_l\Sigma_{mj})\,(\partial_j p)
+\)
+and the term
+\(\varepsilon_{klm}\,\Sigma_{mj}\,\partial_l\partial_j p\)
+vanishes because it contracts an antisymmetric tensor
+(\(\varepsilon_{klm}\)) with a symmetric one
+(\(\partial_l\partial_j p\)).
+
+
 \section{Claude questions}
 
 Consider the SGD update:
@@ -465,4 +533,5 @@ This requires individual gradients to have finite variance.
 If sampling with replacement: No additional constraints beyond finite variance
 If sampling without replacement: Need $B/n \ll 1$
 $B/n \ll 1$ so that dependencies between batches are negligible
+
 \end{document}
