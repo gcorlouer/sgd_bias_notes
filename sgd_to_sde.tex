@@ -326,28 +326,42 @@ Assumptions for the stationary distribution of SGD being the tempered posterior 
 \end{itemize}
 
 \subsection{Ranking assumptions}
-After a deep research with chatGPT \href{https://chatgpt.com/s/dr_6853372e8bf48191913b0ad54514ca1b}{here} here is my updated ranking:
+After a deep research with chatGPT \href{https://chatgpt.com/s/dr_6853372e8bf48191913b0ad54514ca1b}{here} and with elicit \href{https://elicit.com/review/6aefb134-7070-4a9f-bb6d-6f86dff484ac}{here} this is my current ranking of the assumptions:
 \begin{itemize}
-    \item Application of CLT from assuming gaussian gradient noise (finite variance in particular, likely that noise is not gaussian but Levy)
+    \item Application of CLT from assuming gaussian gradient noise (finite variance in particular, likely that noise is not gaussian but Levy). Also an interesting point is that the heavy tailness could be anisotropic i.e. be sensitive to the degeneracies in the loss landscape.
     \item Detailed balance condition from constant noise covariance. In particular this means we must consider a curl component to the probability current.
     \item \textbf{Note}: I am a bit confused about the ranking of the next two items.
     \item Small learning rate: irrealistic but see central flows paper.
     \item No auto-correlation in the noise: this will be violated with momentum in practice (but maybe that's ok as long as it's not long-range auto-correlation?) \textbf{Note}: I am a bit confused about this one. I'd like to understand better violation of long-range auto-correlation. Modification might include: fractional Levy, generalized Langevin dynamics, etc. Need colored noise moodels with memory. Sampling without replacement is common introducing some auto-correlation.
     \item Batch size large enough but small compared with the dataset size seems realistic especially in large scale training.
 \end{itemize}
-
 \section{\textbf{TODO}}
 \begin{itemize}
     \item \sout{Explain why we care about continuous-time limit and connection with the tempered posterior distribution (also mention invertability of the noise covariance)}
     \item \sout{Have a better understanding of the detailed balance condition and links with the curl of the probability current (leading to a non stationary distribution but to an orbit instead)}
     \item Explain the rigorous mathematical derivation of the continuous-time limit of SGD.
-    \item Clarify the importance of assuming finite learning rate. 
+    \item Clarify the importance of assuming finite learning rate. Read the central flows paper.
     \item Check proof of stationary distribution for the case where the noise covariance is not constant.
     \item Explain connection with SLT and spectrum between continuous limit with all assumptions and discrete SGD
     \item Include momentum considerations.
 \end{itemize}
+\section{Questions that we could investigate}
+We could start with replacing the gaussian noise assumption with a heavy tailed noise assumption. One generic idea would be to test the assumption of heavy tailness during the training dynamics. But it seems the sort of things that has already been done. What would be interesting would be to test heavy tailness if we think of a specific hypothesis about why this is plays an important role in the training dynamics. Under what conditions can we compute the stationary distribution of SGD with heavy tailed noise? 
+\\
+\\
+See deep research literature on heavy tailed noise from chatGPT \href{https://chatgpt.com/s/dr_6853577008f88191bba42f17cbfbbc95}{here}.
+Other mention: we could also look at the learning at parity paper and compare heavy tail with non heavy tail noise. One key takeway is that there is evicence for heavy tailness, that it might be important to escape faster from shallow deep minima and saddle point and find broader flat minima which help with generalization. An implication of Levy flight will be that the probability distribution will be differed from the tempered posterior distribution and will be closer to a non equilibrium distribution. 
+\\
+\\
+We could investigate the saddle to saddle dynamics in deep linear networks. We could in particular look at the importance of heavy tailness to favour degenerate minima. Using analytic results from deep linear networks, we could probably compare Gaussian SDE with Levy SDE and see which ones better predicts the training dynamics and the distribution after training. Could we derive some theoretical results about the stationary distribution in deep linear networks using Levy SDE? 
+\\
+\\
+We could look at toy model of superposition and look at phase transition between geometric states and amplitude of noise. One hypothesis could be that phase transition happened when some sufficiently high amplitude noise.
+\\
+\\
+More interestingly we could look at grokking in modular addition. One prediction would be that the noise helps the model escape toward broader and flater basins that generalize better and that this is correlated with the heavy tailness of the noise. Would need to detail the experimental protocol a bit more.
+\subsection{Experiments on deep linear networks}
 \section{Appendix}
-
 \subsubsection{Detailed Derivation of Batch Noise Covariance}
 
 Let's carefully work through the derivation of the batch noise covariance, addressing why we condition on the dataset.
