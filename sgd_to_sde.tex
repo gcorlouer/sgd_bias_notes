@@ -331,7 +331,7 @@ After a deep research with chatGPT \href{https://chatgpt.com/s/dr_6853372e8bf481
     \item Application of CLT from assuming gaussian gradient noise (finite variance in particular, likely that noise is not gaussian but Levy). Also an interesting point is that the heavy tailness could be anisotropic i.e. be sensitive to the degeneracies in the loss landscape.
     \item Detailed balance condition from constant noise covariance. In particular this means we must consider a curl component to the probability current.
     \item \textbf{Note}: I am a bit confused about the ranking of the next two items.
-    \item Small learning rate: irrealistic but see central flows paper.
+    \item Small learning rate: irrealistic but see central flows paper. Would be useful to look more into the edge of stability phenomena literature.
     \item No auto-correlation in the noise: this will be violated with momentum in practice (but maybe that's ok as long as it's not long-range auto-correlation?) \textbf{Note}: I am a bit confused about this one. I'd like to understand better violation of long-range auto-correlation. Modification might include: fractional Levy, generalized Langevin dynamics, etc. Need colored noise moodels with memory. Sampling without replacement is common introducing some auto-correlation.
     \item Batch size large enough but small compared with the dataset size seems realistic especially in large scale training.
 \end{itemize}
@@ -340,7 +340,8 @@ After a deep research with chatGPT \href{https://chatgpt.com/s/dr_6853372e8bf481
     \item \sout{Explain why we care about continuous-time limit and connection with the tempered posterior distribution (also mention invertability of the noise covariance)}
     \item \sout{Have a better understanding of the detailed balance condition and links with the curl of the probability current (leading to a non stationary distribution but to an orbit instead)}
     \item Explain the rigorous mathematical derivation of the continuous-time limit of SGD.
-    \item Clarify the importance of assuming finite learning rate. Read the central flows paper.
+    \item Clarify the importance of assuming finite learning rate. Read the central flows paper. Edge of stability implies that naive continuous time limit is not valid.
+    \item Relatedly to a review of edge of stability phenomena literature.
     \item Check proof of stationary distribution for the case where the noise covariance is not constant.
     \item Explain connection with SLT and spectrum between continuous limit with all assumptions and discrete SGD
     \item Include momentum considerations.
@@ -361,9 +362,93 @@ We could look at toy model of superposition and look at phase transition between
 \\
 More interestingly we could look at grokking in modular addition. One prediction would be that the noise helps the model escape toward broader and flater basins that generalize better and that this is correlated with the heavy tailness of the noise. Would need to detail the experimental protocol a bit more.
 \subsection{Experiments on deep linear networks}
+See chat with Opus \href{https://claude.ai/chat/ac289a72-d57a-4d4b-ad09-38f17425753c}{here}.
+\section{Questions}
+How does gradient clipping affects SGD noise? Does not prevent heavy tail because gradient clipping is applied to batch gradient and not to the noise. So noise could be unbounded because of large fluctuations coming from difference between batch gradient and empirical gradient.
+
+What is the difference between the tempered posterior distribution and the Bayesian posterior?
+
+What is the intuition behind the curl of the probability current? How much does it deviate from the tempered posterior distribution/Bayes posterior? Also how much does it matter that the current is not curl-free?
+\section{Research Proposal}
+
+\subsection{Motivation}
+
+Stochastic Gradient Descent (SGD) is the central algorithm driving deep learning. While it is often modeled mathematically using simplified stochastic differential equation (SDE) approximations, these standard approximations typically rely on assumptions that are empirically invalid during actual deep neural network training. Specifically, standard assumptions include:
+
+\begin{itemize}
+\item \textbf{Gaussian Gradient Noise}: Empirically violated due to observed heavy-tailed gradient distributions.
+\item \textbf{Detailed Balance (Curl-Free Probability Current)}: Empirically violated due to noise anisotropy, leading to a non-zero curl in probability currents.
+\item \textbf{Small Learning Rate Approximation}: Empirically violated by observed edge-of-stability phenomena, including oscillatory dynamics.
+\end{itemize}
+
+These violations imply that the distribution of SGD trajectories significantly deviates from the classical tempered posterior (Gibbs distribution) predicted by naive SDE models.
+
+To address these shortcomings, we propose a refined SDE model incorporating key empirically supported phenomena:
+
+\begin{itemize}
+\item \textbf{Gradient Term}: Standard loss gradient.
+\item \textbf{Central Flow Term}: Capturing oscillatory dynamics and sharpness-induced flows from edge-of-stability phenomena.
+\item \textbf{Levy Noise with Anisotropic Covariance}: Capturing heavy-tailed and anisotropic gradient noise empirically observed during training.
+\end{itemize}
+
+The primary motivation from an AI alignment perspective is to better characterize the inductive biases of SGD. Accurately sampling the SGD trajectory distribution is critical for understanding the robustness of safety properties. Such an approach will aid in determining the likelihood of model trajectories remaining aligned and safe upon further training, as opposed to bifurcating toward deceptive or misaligned models (or being already deceptive if most models sampled on the degenerate set of loss minimizers contain many deceptive models).
+
+\subsection{Proposed Experiment}
+
+\textbf{Objective:} Validate our refined SDE model by comparing the distributions it generates against actual SGD trajectory distributions and those predicted by naive Gaussian-based SDE approximations.
+
+\textbf{Setup: Deep Linear Networks (DLNs)}
+
+We focus on DLNs, as they offer analytically tractable solutions and clear characterizations of degenerate minima.
+
+\textbf{Experimental Protocol:}
+
+\textbf{Initialization:}
+\begin{itemize}
+\item Initialize identical sets of parameters for multiple independent runs.
+\end{itemize}
+
+\textbf{Trajectory Generation:}
+\begin{itemize}
+\item \textbf{SGD Trajectories}: Simulate true SGD with mini-batches of synthetic data.
+\item \textbf{Naive SDE Sampler}: Standard Brownian-motion-driven Langevin dynamics with isotropic (or anisotropic) Gaussian noise and no central flow.
+\item \textbf{Refined SDE Sampler}: Proposed SDE with central flow, Levy-stable noise (heavy tails), and anisotropic covariance reflecting empirical gradient statistics.
+\end{itemize}
+
+\textbf{Sampling Procedure:}
+\begin{itemize}
+\item Simulate long trajectories for each method.
+\item Project trajectories numerically onto the degenerate solution manifold.
+\end{itemize}
+
+\textbf{Distribution Analysis:}
+\begin{itemize}
+\item Compute empirical distributions of parameters projected onto $\mathcal{M}$.
+\item Quantify the shape of distributions (e.g., covariance eigen-spectrum, principal components).
+\end{itemize}
+
+\textbf{Distance Metrics for Comparison:}
+\begin{itemize}
+\item \textbf{Wasserstein-2 (Earth Mover’s Distance)}: Robust measure of distributional differences.
+\item \textbf{Maximum Mean Discrepancy (MMD)}: Non-parametric kernel-based measure suitable for finite samples.
+\item \textbf{Approximate KL Divergence}: Fit Gaussian mixture models to trajectories and estimate analytically.
+\end{itemize}
+
+\subsection{Hypothesis}
+
+\textbf{Primary Hypothesis:} The refined SDE model sampler produces trajectory distributions that significantly better match actual SGD empirical distributions along degenerate minima than naive Gaussian-based SDE samplers.
+
+\textbf{Evaluation:}
+\begin{itemize}
+\item Compute pairwise distributional distances: Actual SGD $\leftrightarrow$ Naive SDE, Actual SGD $\leftrightarrow$ Refined SDE.
+\item Statistically assess the hypothesis (e.g., via bootstrapping or significance testing).
+\end{itemize}
+
+\end{document}
+
+
 \section{Appendix}
 \subsubsection{Detailed Derivation of Batch Noise Covariance}
-
 Let's carefully work through the derivation of the batch noise covariance, addressing why we condition on the dataset.
 
 \textbf{Why Condition on the Dataset?}
