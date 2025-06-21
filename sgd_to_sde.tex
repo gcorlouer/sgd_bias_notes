@@ -15,6 +15,21 @@
 
 \begin{document}
 
+\section{General motivation}
+
+The inductive biases of deep learning optimziers are not well understood. SGD and its variants (e.g. Adam) are discrete update algorithms. At the beginning of training, the model parameters are initialized from some probability distribution (e.g. some gaussian distribution). Given some initial set of parameters, the SGD update has some stochasticity caused by sampling finite batches. These two sources of randomness means that SGD could end up in different minimizers from the same initial set of parameters. We want to characterize the distribution of the parameters during and at the end of training. 
+
+The motivation for safety is to be able to sample such distribution of parameters. If we had a good sampler of the distribution of parameters during training, we could systematically sample models that are compatible with minimizing the loss. We would have better guarantees that the sampling process is unbiased and how long it would take to sample the distribution of parameters that are accessible to the sampler. This would for example allows to determine the fraction of model minimizing the loss that are safe or unsafe and give us a lower bound on the probability of sampling a safe model in the set of degenerate solutions of the loss minimization and in particular and also help us understand the robustness of some safety property.
+
+The simplest way to model SGD is to consider the continuous-time limit of SGD. The continuous-time limit of SGD is a stochastic differential equation (SDE) that describes the evolution of the parameters during training. Under Gaussian assumptions of the noise, this continuous-time limit leads to an SDE with a drift term and a Wiener process. Under further assuming that the noise covariance of the noise is constant, we can show that the stationary distribution of SGD obtained from Fokker-Planck is the same as the tempered Bayesian posterior distribution i.e. a Gibbs distribution with a temperature parameter.
+
+This model of SGD has been heavily exploited in the literature, but the assumptions that are made by such models are not always valid. For example, the noise covariance is not constant (anisotropy) and SGD noise has heavy tails. Also, finite learning rate is important because of edge of stability phenomena where finite learning rate allows induced some sensitivity to the curvature in the dynamics inducing SGD to escape the sharpest minima. Subdiffusive phenomena have also been observed which can be modelled at the level of the Fokker-Planck equation by a fractional time derivative operator. 
+
+A more general model of SGD would take into account: a central flow term to model edge of stability phenomena from finite learning rate, a Levy process with alpha stable distribution to model heavy tails of the noise, a fractional time derivative operator to model subdiffusive phenomena and a non-constant noise covariance matrix to model anisotropy of the noise.
+
+In this work we propose to bring together a more general SDE model of SGD taking into account these different effects. We study the empirical relevance of such SDE on toy models: deep linear networks, modular addition and toy transformer models. The main hypothesis that we test are wether the distribution of parameters obtained by such model better capture the training dynamics in toy models than the Langevin SDE model of SGD which leads to a tempered posterior distribution.
+
+
 \section{Introduction to Stochastic Gradient Descent}
 
 \subsection{Problem Setup}
@@ -369,6 +384,10 @@ How does gradient clipping affects SGD noise? Does not prevent heavy tail becaus
 What is the difference between the tempered posterior distribution and the Bayesian posterior?
 
 What is the intuition behind the curl of the probability current? How much does it deviate from the tempered posterior distribution/Bayes posterior? Also how much does it matter that the current is not curl-free?
+
+How important is considering SGD vs ADAM?
+
+Is there a tension between having a time-fractional and a parameter-fractional fokker planck operator? Perhaps there are different regime in which subdiffusive and superdiffusive behavior matters more and we don't need to have both operators at the same time.
 \section{Research Proposal}
 
 \subsection{Motivation}
