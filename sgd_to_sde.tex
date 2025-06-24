@@ -415,47 +415,55 @@ The primary motivation from an AI alignment perspective is to better characteriz
 \subsection{Proposed Experiment}
 
 \textbf{Objective:} Validate our refined SDE model by comparing the distributions it generates against actual SGD trajectory distributions and those predicted by naive Gaussian-based SDE approximations.
-
+\\
+\\
 \textbf{Setup: Deep Linear Networks (DLNs)}
-
-We focus on DLNs, as they offer analytically tractable solutions and clear characterizations of degenerate minima.
-
-\textbf{Experimental Protocol:}
-
+We focus on DLNs, as they offer analytically tractable solutions and clear characterizations of degenerate minima. We also know that it is possible to have interesting saddle-to-saddle dynamics in DLNs and the more lazy NTK regime. Furthermore, we know from the saddle to saddle dynamics that SGD favour low rank solutions during training. It would be interesting to understand the influence different terms in the SDE model on the saddle to saddle dynamics.
+\\
+\\
+\textbf{Experimental Protocol.}
+\\
 \textbf{Initialization:}
 \begin{itemize}
-\item Initialize identical sets of parameters for multiple independent runs.
+\item Saddle to saddle initialization: Initialize parameters with a small covariance such that the initial parameters are close to a saddle point.
+\item More lazy NTK regime: Initialize parameters with a large covariance such that initial parameters can be close to a global minimum.
 \end{itemize}
 
+\textbf{Data generation:}
+\begin{itemize}
+\item Generate synthetic data as random matrices: can try normal or heavy tailed random matrices.
+\end{itemize}
 \textbf{Trajectory Generation:}
 \begin{itemize}
 \item \textbf{SGD Trajectories}: Simulate true SGD with mini-batches of synthetic data.
-\item \textbf{Naive SDE Sampler}: Standard Brownian-motion-driven Langevin dynamics with isotropic (or anisotropic) Gaussian noise and no central flow.
-\item \textbf{Refined SDE Sampler}: Proposed SDE with central flow, Levy-stable noise (heavy tails), and anisotropic covariance reflecting empirical gradient statistics.
+\item \textbf{Langevin SDE}: Standard Brownian-motion-driven Langevin dynamics with isotropic (or anisotropic) Gaussian noise and no central flow.
+\item \textbf{Refined SDE}: Proposed SDE with central flow, Levy-stable noise (heavy tails), and anisotropic covariance (rotational current) reflecting different assumptions behind SGD.
 \end{itemize}
-
-\textbf{Sampling Procedure:}
-\begin{itemize}
-\item Simulate long trajectories for each method.
-\item Project trajectories numerically onto the degenerate solution manifold.
-\end{itemize}
-
 \textbf{Distribution Analysis:}
 \begin{itemize}
-\item Compute empirical distributions of parameters projected onto $\mathcal{M}$.
-\item Quantify the shape of distributions (e.g., covariance eigen-spectrum, principal components).
+\item Estimate some distance between distributions obtained from SGD and the various SDE models.
+\item Quantify the shape of distributions (e.g. covariance,skewness and higher moments).
 \end{itemize}
-
 \textbf{Distance Metrics for Comparison:}
 \begin{itemize}
-\item \textbf{Wasserstein-2 (Earth Mover’s Distance)}: Robust measure of distributional differences.
+\item \textbf{Wasserstein-2 (Earth Mover’s Distance)}: Measure of distributional differences.
 \item \textbf{Maximum Mean Discrepancy (MMD)}: Non-parametric kernel-based measure suitable for finite samples.
-\item \textbf{Approximate KL Divergence}: Fit Gaussian mixture models to trajectories and estimate analytically.
+\item \textbf{Approximate KL Divergence}: can we estimate some empirical version?
+\item Pb: not sure if any of this is tractable
 \end{itemize}
 
+\textbf{Tracking escape dynamics from saddle points.}
+We could test wether heavy tailness of SDE with Levy process (using alpha stable distribution) helps to predict escaping from saddle points compared with a Gaussian SDE.
+Process:
+\begin{itemize}
+    \item Detect saddle points (for at loss plateaus, monitor gradient norm and hessian eigenvalues as one should be negative).
+    \item Collect gradient noise around saddle points from SGD and SDE models (naive vs refined)
+    \item Track tail index indicator e.g. Hill estimator. Hypothesis: Heavy tailness correlates with faster escape from saddle points.
+    \item We could look at escape time from saddle point vs heavy tailness and rotational current. Need to estimate escape time from saddle point but not sure how.
+\end{itemize}
 \subsection{Hypothesis}
 
-\textbf{Primary Hypothesis:} The refined SDE model sampler produces trajectory distributions that significantly better match actual SGD empirical distributions along degenerate minima than naive Gaussian-based SDE samplers.
+\textbf{Overall main Hypothesis:} The refined SDE model sampler produces trajectory distributions that significantly better match actual SGD empirical distributions along degenerate minima than naive Gaussian-based SDE samplers.
 
 \textbf{Evaluation:}
 \begin{itemize}
