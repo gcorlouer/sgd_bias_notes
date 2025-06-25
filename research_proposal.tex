@@ -1,0 +1,167 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=0.5in]{geometry}  
+\geometry{a4paper, margin=1in}
+\usepackage{comment} % for comments
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{hyperref}
+\usepackage{graphicx}
+% Required packages for algorithms
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage[normalem]{ulem}
+
+\begin{document}
+
+\section*{Inductive Biases of SGD: Research Proposal}
+
+\subsection*{Motivation}
+
+Stochastic Gradient Descent (SGD) (and its variants) is a central algorithm driving deep learning. SGD is often modeled mathematically using simplified stochastic differential equation (SDE) approximations. A common assumption is to model SGD as some Langevin dynamics but it is empirically invalid during actual deep neural network training. Specifically, standard assumptions for Langevin that are not satisfied:
+\begin{itemize}
+\item \textbf{Gradient Noise Anisotropy}: Noise covariance depends on the geometry of the loss surface.
+\item \textbf{Heavy-tailed Gradient Noise}: Empirically violated due to observed heavy-tailed gradient distributions.
+\item \textbf{Detailed Balance (Curl-Free Probability Current)}: In general we expect a non-zero curl in probability currents.
+\item \textbf{Small Learning Rate Approximation}: Empirically violated by observed edge-of-stability phenomena with oscillatory dynamics.
+\end{itemize}
+These violations imply that the distribution of SGD trajectories significantly deviates from the tempered posterior (Gibbs distribution) resulting from Langevin models of SGD. 
+\\
+\\
+To address these shortcomings, we propose to investigate refined SDE models incorporating key phenomena:
+\begin{itemize}
+\item \textbf{Levy Noise with Anisotropic Covariance}: Capturing heavy-tailed and anisotropic gradient noise empirically observed during training.
+\item \textbf{Central Flow Term}: Capturing oscillatory dynamics and sharpness-induced flows from edge-of-stability phenomena.
+\item \textbf{Fractional time Fokker Planck derivative} for subdiffusive behaviour.
+\end{itemize}
+\textbf{Theory project:} It would be useful to write a clear paper on SDE models of SGD and the deviations from the Langevin regime. The paper would introduce a more general model of SGD that includes central flow, Levy noise, anisotropic covariance, fractional time Fokker Planck derivative and rotational probability current. The paper could also review the literature on how these different assumptions matter for SGD.
+\\
+\\
+Generally speaking understanding the inductive biases of SGD is likely to be important for AI alignment. More specifically, accurately sampling the SGD trajectory distribution would be helpful for understanding the robustness of safety properties. Such an approach will aid in determining the likelihood of model trajectories remaining aligned and safe upon further training, as opposed to bifurcating toward deceptive or misaligned models (or being already deceptive if most models sampled on the degenerate set of loss minimizers contain many deceptive models).
+\subsection*{Empirical directions}
+\textbf{Objective:} Validate our refined SDE model by comparing the distributions it generates against actual SGD trajectory distributions and those induced by a Langevin SDE approximation of SGD.
+\\
+\\
+It seems particularly interesting to investigate the effect of noise anisotropy and heavy-tailed gradient noise on the saddle to saddle dynamics in DLNs. The saddle-to-saddle dynamics in DLN is a well studied phenomnon that has sufficiently rich dynamics close to more realistic deep learning models (e.g. feature learning).
+\\
+\\
+The importance of stochasticity in the dynamics of SGD for learning is particularly interesting. So I suggest to let the central flow factor aside for some later study. Additionally, it seems plausible that mixing time are too long for SGD to reach the stationary distribution so we could also let the curl-free probability current aside for some later study. Although keep in mind that stationary distribution might be relevant on subspaces of the parameter space over which mixing time are long enough (e.g. maybe because SGD explores along degenerate directions). We could also look at the effect of the central flow term on the saddle to saddle dynamics.
+\\
+\\
+\textbf{Setup: Deep Linear Networks (DLNs)}
+We could focus on DLNs, as they offer more analytically tractable analyses and known characterizations of degenerate minima (see Simon paper). It is possible to have interesting saddle-to-saddle dynamics in DLNs which resemble feature learning in deep neural networks. Furthermore, it seems that SGD favours low rank solutions during training of deep linear networks. We want to understand deviation from the Langevin regime in the SDE model of SGD on the saddle to saddle dynamics by investigating the effect of noise anisotropy and heavy-tailed gradient noise around Saddle points.
+\\
+\\
+\textbf{Experimental Protocol.}
+\\
+\textbf{Initialization:}
+\begin{itemize}
+\item Saddle to saddle initialization: Initialize parameters with a small covariance such that the initial parameters are close to a saddle point.
+\item More lazy NTK regime: Initialize parameters with a large covariance such that initial parameters can be close to a global minimum.
+\end{itemize}
+
+\textbf{Data generation:}
+\begin{itemize}
+\item Generate synthetic data as random matrices: can try normal or heavy tailed random matrices.
+\end{itemize}
+\textbf{Trajectory Generation:}
+\begin{itemize}
+\item \textbf{SGD Trajectories}: Simulate true SGD with mini-batches of synthetic data.
+\item \textbf{Langevin SDE}: Standard Brownian-motion-driven Langevin dynamics with isotropic Gaussian noise and no central flow.
+\item \textbf{Refined SDE}: Proposed SDE with Levy-stable noise (heavy tails), and anisotropic covariance (rotational current). Potentially look at central flow and fractional time Fokker Planck derivative.
+\end{itemize}
+\textbf{Measuring distance between SGD and SDE distributions}
+\begin{itemize}
+\item Estimate some distance between distributions obtained from SGD and the various SDE models. \textbf{Question: What notion of distance would be tractable and relevant?} e.g. KL divergence might be difficult to estimate. 
+\item Quantify the shape of distributions (e.g. covariance, skewness and higher moments).
+\end{itemize}
+\textbf{Suggestions of Distance Metrics for Comparison:}
+This is something to investigate in more details.
+\begin{itemize}
+\item \textbf{Wasserstein-2}: Measure of distributional differences (connections with optimal transport?)
+\item \textbf{Maximum Mean Discrepancy (MMD)}: Non-parametric kernel-based measure.
+\item \textbf{Approximate KL Divergence}: can we estimate some empirical version?
+\end{itemize}
+\textbf{Tracking escape dynamics from saddle points.}
+We could test wether noise anisotropy and heavy tailness of SDE with Levy process (using some alpha stable distribution) helps to predict escaping from saddle points better compared with a Gaussian SDE.
+Process:
+\begin{itemize}
+    \item Detect saddle points (for at loss plateaus, monitor gradient norm and hessian eigenvalues as one should be negative).
+    \item Collect gradient noise around saddle points from SGD and SDE models (naive vs refined)
+    \item Track tail index indicator e.g. Hill estimator. Hypothesis: Heavy tailness correlates with faster escape from saddle points.
+    \item We could look at escape time from saddle point with anistoropic heavy tail noise vs Langevin SDE and SGD.
+\end{itemize}
+\section*{Broad Research Plan}
+Early draft for now. Some tasks and goals that we might do:
+\begin{itemize}
+    \item Read literature on the relevance of noise anisotropy and heavy tailness of gradient noise for deep learning
+    \item Validate that DLNs are interesting toy models for our project. Otherwise explore other toy models (simple low dimensional loss landscapes, toy models of superpositions, toy models of computations e.g. modular addition, parity learning, etc.)
+    \item Read literature on DLNs
+    \item Understand how to generate processes with alpha stable distribution
+    \item Scope experiments (especially with Avi)
+    \item Code DLN setup
+    \item Being able to run SGD and SDE training dynamics on DLNs (\textbf{Is it computationally difficult to run many SGD and SDE trajectories on DLNs?})
+    \item Being able to detect saddle points in DLNs
+    \item Measuring distance between distributions of SGD and SDE models
+    \item Tracking escape dynamics from saddle points
+    \item Computing escape time from saddle points
+    \item Figuring out good test statistics to monitor effect of heavy tailness and noise anisotropy on escape dynamics from saddle points
+    \item Figuring out test statistics to measure moments of the SGD and SDE distributions 
+    \item Running many experiments to get robust statistics and compare distributions between SGD and SDE models
+    \item Interpreting results
+    \item Writing up general paper on SDE models of SGD: deviations from the Langevin regime and SLT
+    \item Writing up a paper toward the end of the fellowship from our empirical results
+    \item Presenting our work at the Illiad conference
+\end{itemize}
+\begin{longtable}{>{\bfseries}c | c | m{4cm} | m{5cm} | m{4cm}}
+\toprule
+Week & Dates & Main Goals & Key Tasks \\
+\midrule
+1 & June 30--July 6 & Prepare experiments & 
+- Read Deep Linear Networks literature \newline 
+- Read relevant literature on noise anisotropy and heavy tailness of gradient noise \newline 
+- Scope experiments with Avi \newline
+- Validate that DLNs are interesting toy models for our project\newline
+- Start Coding DLN setup\\
+\midrule
+2 & July 7--July 13 & Run SGD and SDE experiments and DLNs & 
+- Running SGD and SDEs on DLNs \newline
+- Reading more literature on DLNs and influence of SGD noise on saddle to saddle dynamics \newline
+- Figuring out test statistics to monitor effect of heavy tailness and noise anisotropy on escape dynamics from saddle points (literature will be useful here)\\
+\midrule
+3 & July 14--July 20 & Get some qualitative results from experiments & 
+- Get some summary statistics to compare distributions between SGD and SDE models \newline
+- Make progress on general paper on inductive biases of SGD\\
+\midrule
+4 & July 21--July 27 & Experiments & 
+- Estimate test statistics to monitor effect of heavy tailness and noise anisotropy \\
+\midrule
+5 & July 22--July 28 & Experiments & 
+- Mid-point review \\
+\midrule
+6 & July 29--Aug 4 & Experiments & 
+- More experiments \newline
+- Writing up methods and background for paper \newline
+- General paper on inductive biases of SGD\\
+\midrule
+7 & Aug 5--Aug 11 & Interpret results & 
+- More experiments \newline
+- Writing up paper \\
+\midrule
+8 & Aug 12--Aug 18 & Experiments & 
+- More experiments \\
+\midrule
+9 & Aug 19--Aug 25 & Experiments & 
+- More experiments \newline
+- Prepare talk for Illiad conference \\
+\midrule
+10 & Aug 26--Sep 1 & 
+- Illiad conference \\
+% Add more weeks as needed
+\bottomrule
+\end{longtable}
+\end{document}
