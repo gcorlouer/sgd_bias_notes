@@ -350,6 +350,97 @@ After a deep research with chatGPT \href{https://chatgpt.com/s/dr_6853372e8bf481
     \item No auto-correlation in the noise: this will be violated with momentum in practice (but maybe that's ok as long as it's not long-range auto-correlation?) \textbf{Note}: I am a bit confused about this one. I'd like to understand better violation of long-range auto-correlation. Modification might include: fractional Levy, generalized Langevin dynamics, etc. Need colored noise moodels with memory. Sampling without replacement is common introducing some auto-correlation.
     \item Batch size large enough but small compared with the dataset size seems realistic especially in large scale training.
 \end{itemize}
+
+\section{SDE on DLNs}
+\begin{comment}
+Consider a two layer linear network with weight matrices $W^1$ and $W^2$ and input data $x^{\mu}$ and output data $y^{\mu}$. The empirical loss is given by:
+\begin{align}
+L_N(W^1, W^2; D_N) = \frac{1}{N} \sum_{\mu=1}^N ||y^{\mu} - W^2 W^1 x^{\mu}||_2
+\end{align}
+The gradient is given by:
+\begin{align}
+    g_{mn}^{\nu} & = \frac{\partial}{\partial W_{mn}^{\nu}} L_N(W^1, W^2) \\ 
+    & = \frac{1}{N} \frac{\partial}{\partial W_{mn}^{\nu}} \sum_{\mu=1}^N (y^{\mu T}y^{\mu} - x^{\mu T}W^{1T}W^{2T}y^{\mu} - y^{\mu T}W^{2}W^{1}x^{\mu} + x^{\mu T}W^{1T}W^{2T}W^{2}W^1x^{\mu}) \\
+    & = \frac{1}{N} \frac{\partial}{\partial W_{mn}^{\nu}} \sum_{\mu=1}^N (y^{\mu }_i y^{\mu}_i - x^{\mu}_i W^{1}_{ki}W^{2}_{jk}y^{\mu}_j - y^{\mu}_iW^{2}_{ik}W^{1}_{kj}x^{\mu}_j + x^{\mu}_lW^{1}_{kl}W^{2}_{ki}W^{2}_{ip}W^1_{pr}x^{\mu}_{r})\\
+\end{align}
+Let's compute the gradient w.r.t to the first weight matrix $W^1$.
+\begin{align}
+    g^1_{mn} & = \frac{1}{N} \sum_{\mu=1}^N ( - x^{\mu}_i\delta_{km,in}W^{2}_{jk}y^{\mu}_j - y^{\mu}_iW^{2}_{ik}\delta_{km, jn}x^{\mu}_j + x^{\mu}_l\delta_{km, ln}W^{2}_{ki}W^{2}_{ip}W^1_{pr}x^{\mu}_{r} + x^{\mu}_lW^{1}_{kl}W^{2}_{ki}W^{2}_{ip}\delta_{pm, rn}x^{\mu}_{r})\\
+    & = \frac{1}{N} \sum_{\mu=1}^N - x^{\mu}_n W^{2}_{jm}y^{\mu}_j - y^{\mu}_iW^{2}_{im}x^{\mu}_n + x^{\mu}_nW^{2}_{mi}W^{2}_{ip}W^1_{pr}x^{\mu}_{r} + x^{\mu}_lW^{1}_{kl}W^{2}_{ki}W^{2}_{im}x^{\mu}_{n}\\
+\end{align}
+Which in matrix form is:
+\begin{align}
+    g^1 = \frac{2}{N} \sum_{\mu=1}^N (- x^{\mu}y^{\mu T}W^{2T} + x^{\mu}x^{\mu T}W^{1T}W^{2T}W^{2})  
+\end{align}
+\end{comment}
+For input–output pairs \((x^{\mu},y^{\mu})\) and weight matrices
+\(W^{1}\in\mathbb R^{d_{1}\times d_{0}}\), \(W^{2}\in\mathbb R^{d_{2}\times d_{1}}\),
+let the empirical (squared–error) loss be
+\[
+L_N(W^{1},W^{2})
+   \;=\;
+   \frac{1}{N}\sum_{\mu=1}^{N}
+   \bigl\lVert\,y^{\mu}-W^{2}W^{1}x^{\mu}\bigr\rVert_2^{2}.
+\]
+
+\paragraph{Expanded form.}
+With Einstein summation over repeated indices (\(i,j,k,l,p,r\)),
+\[
+\boxed{
+L_N=\frac{1}{N}\!
+     \sum_{\mu=1}^{N}\!
+     \Bigl(
+           y^{\mu}_{i}y^{\mu}_{i}
+           -2\,y^{\mu}_{i}W^{2}_{ik}W^{1}_{kj}x^{\mu}_{j}
+           +x^{\mu}_{l}W^{1}_{kl}W^{2}_{ki}W^{2}_{ip}W^{1}_{pr}x^{\mu}_{r}
+     \Bigr)}
+\]
+\paragraph{Gradient w.r.t.\ the first layer \(\,W^{1}\).}
+\[
+\boxed{
+g^{1}_{mn}
+   =\frac{\partial L_N}{\partial W^{1}_{mn}}
+   =\frac{2}{N}\sum_{\mu=1}^{N}
+     x^{\mu}_{n}\,
+     W^{2}_{i m}
+     \bigl(
+           W^{2}_{i k}W^{1}_{k j}x^{\mu}_{j}-y^{\mu}_{i}
+     \bigr)}
+\]
+
+\noindent
+Matrix form (with sample matrices \(X=[x^{1}\!\dots x^{N}]\) and
+\(Y=[y^{1}\!\dots y^{N}]\)):
+\[
+\boxed{
+\nabla_{W^{1}}L_N
+   =\frac{2}{N}\,W^{2\!\top}
+     \bigl(W^{2}W^{1}X-Y\bigr)\,X^{\!\top}}
+\]
+
+\paragraph{Gradient w.r.t.\ the second layer \(\,W^{2}\).}
+\[
+\boxed{
+g^{2}_{mn}
+   =\frac{\partial L_N}{\partial W^{2}_{mn}}
+   =\frac{2}{N}\sum_{\mu=1}^{N}
+     \bigl(
+          W^{2}_{m k}W^{1}_{k j}x^{\mu}_{j}-y^{\mu}_{m}
+     \bigr)
+     \bigl(
+          W^{1}_{n j}x^{\mu}_{j}
+     \bigr)}
+\]
+
+\noindent
+Matrix form:
+\[
+\boxed{
+\nabla_{W^{2}}L_N
+   =\frac{2}{N}\,
+     \bigl(W^{2}W^{1}X-Y\bigr)\,
+     \bigl(W^{1}X\bigr)^{\!\top}}
+\]
 \section{\textbf{TODO}}
 \begin{itemize}
     \item \sout{Explain why we care about continuous-time limit and connection with the tempered posterior distribution (also mention invertability of the noise covariance)}
@@ -660,4 +751,8 @@ If sampling with replacement: No additional constraints beyond finite variance
 If sampling without replacement: Need $B/n \ll 1$
 $B/n \ll 1$ so that dependencies between batches are negligible
 
+\section{Implicit biases of SGD on DLNs}
+DLNs are interesting to study as mathematical tractable models of deep learning. It seems natural to study the implicit biases of SGD on DLNs as a first step toward understanding the implicit biases introduced by the gradient and the noise. A particularly interesting phenomena is that SGD shows an implicit bias towards low rank solutions. In particular this effects seems different in SGD compared to GD where the anisotropy of the noise induces further bias toward low rank solutions. This is something that we could check empirically on DLNs. 
+
+Another interesting aspect of DLNs is their saddle to saddle dynamics. There is a large fraction of non-strict saddle points in DLNs (i.e. such that the Hessian can have a zero eigenvalue). We could study the escape times and mixing times of GD, SGD and SDEs around saddle points. Since we know about some characterizations of theses saddle points, we could look into different SDE models around these saddle points.
 \end{document}
