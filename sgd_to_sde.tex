@@ -373,6 +373,7 @@ Which in matrix form is:
     g^1 = \frac{2}{N} \sum_{\mu=1}^N (- x^{\mu}y^{\mu T}W^{2T} + x^{\mu}x^{\mu T}W^{1T}W^{2T}W^{2})  
 \end{align}
 \end{comment}
+\subsection{Gradients}
 For input–output pairs \((x^{\mu},y^{\mu})\) and weight matrices
 \(W^{1}\in\mathbb R^{d_{1}\times d_{0}}\), \(W^{2}\in\mathbb R^{d_{2}\times d_{1}}\),
 let the empirical (squared–error) loss be
@@ -382,7 +383,6 @@ L_N(W^{1},W^{2})
    \frac{1}{N}\sum_{\mu=1}^{N}
    \bigl\lVert\,y^{\mu}-W^{2}W^{1}x^{\mu}\bigr\rVert_2^{2}.
 \]
-
 \paragraph{Expanded form.}
 With Einstein summation over repeated indices (\(i,j,k,l,p,r\)),
 \[
@@ -409,13 +409,13 @@ g^{1}_{mn}
 \]
 
 \noindent
-Matrix form (with sample matrices \(X=[x^{1}\!\dots x^{N}]\) and
+Matrix form:
 \(Y=[y^{1}\!\dots y^{N}]\)):
 \[
 \boxed{
-\nabla_{W^{1}}L_N
-   =\frac{2}{N}\,W^{2\!\top}
-     \bigl(W^{2}W^{1}X-Y\bigr)\,X^{\!\top}}
+g^1 = \nabla_{W^{1}}L_N
+   =\frac{2}{N}\,W^{2\!\top} \sum_{\mu=1}^{N}
+     \bigl(W^{2}W^{1}x^{\mu}x^{\mu T}-y^{\mu}x^{\mu T}\bigr)}
 \]
 
 \paragraph{Gradient w.r.t.\ the second layer \(\,W^{2}\).}
@@ -436,11 +436,204 @@ g^{2}_{mn}
 Matrix form:
 \[
 \boxed{
-\nabla_{W^{2}}L_N
-   =\frac{2}{N}\,
-     \bigl(W^{2}W^{1}X-Y\bigr)\,
-     \bigl(W^{1}X\bigr)^{\!\top}}
+g^2 = \nabla_{W^{2}}L_N
+   =\frac{2}{N}\sum_{\mu=1}^{N}
+     \bigl(W^{2}W^{1}x^{\mu}x^{\mu T}-y^{\mu}x^{\mu T}\bigr)W^{1\!\top}}
 \]
+Define the data and input-output covariance matrices  
+\begin{align}
+    \Sigma_x^{\mu} & = x^{\mu}x^{\mu T}\\
+    \Sigma_{xy}^{\mu} & = y^{\mu}x^{\mu T}\\
+\end{align}
+Then the gradients write
+\begin{align}   
+   g^1 = \frac{2}{N} W^{2T}\sum_{\mu=1}^{N}\bigl(W^2W^1\Sigma_x^{\mu} - \Sigma_{xy}^{\mu}\bigr)\\
+   g^2 = \frac{2}{N} \sum_{\mu=1}^{N}\bigl(W^2W^1\Sigma_x^{\mu} - \Sigma_{xy}^{\mu}\bigr)W^{1T}\\
+\end{align}
+The zero condition of the gradients give $d_0d_1 + d_1d_2$ quadratic equations with $d_0d_1 + d_1d_2 + d_0d_2$ unknowns. Since there is a common factor among the equations we should expect the set of critical points to be infinite.
+\subsection{Noise covariance}
+We consider the 1-sample gradient noise covariance matrix:
+\begin{align}
+    \Sigma = \frac{1}{N} \sum_{\mu=1}^{N} (g_N - g_{\mu})(g_N - g_{\mu})^T
+\end{align}
+i.e.
+\begin{align}
+    \Sigma^{ij} = \frac{1}{N} \sum_{\mu=1}^{N} (g_N - g^i_{\mu})(g_N - g^j_{\mu})^T\\
+\end{align}
+
+%------------------------------------------------------------
+% 1-sample gradient noise covariance for a two–layer linear net
+%------------------------------------------------------------
+
+\paragraph{Abbreviations.}
+\[
+r^{\mu}:=W^{2}W^{1}x^{\mu}-y^{\mu},
+\qquad
+h^{\mu}:=W^{1}x^{\mu},
+\qquad
+Z^{\mu}:=r^{\mu}x^{\mu\!\top}\in\mathbb R^{d_{2}\times d_{0}},
+\qquad
+\bar Z:=\frac1N\sum_{\nu=1}^{N}Z^{\nu}.
+\]
+
+\paragraph{Per–sample and mean gradients.}
+\[
+\begin{aligned}
+g^{1}_{\mu}&=2\,W^{2\!\top}Z^{\mu},
+& g^{1}_{N}&=\frac{2}{N}W^{2\!\top}\sum_{\nu}Z^{\nu}=2\,W^{2\!\top}\bar Z,\\[4pt]
+g^{2}_{\mu}&=2\,r^{\mu}h^{\mu\!\top}=2\,Z^{\mu}W^{1\!\top},
+& g^{2}_{N}&=\frac{2}{N}\sum_{\nu}Z^{\nu}W^{1\!\top}=2\,\bar ZW^{1\!\top}.
+\end{aligned}
+\]
+
+\paragraph{Centred gradients.}
+\[
+\Delta^{1}_{\mu}:=g^{1}_{\mu}-g^{1}_{N}=2\,W^{2\!\top}\!(Z^{\mu}-\bar Z),
+\qquad
+\Delta^{2}_{\mu}:=g^{2}_{\mu}-g^{2}_{N}=2\,(Z^{\mu}-\bar Z)W^{1\!\top}.
+\]
+
+\paragraph{Vectorisation trick.}
+Let \(\operatorname{vec}\) stack matrix columns and recall
+\(\operatorname{vec}(A\,B)=(I\!\otimes\!A)\operatorname{vec}B\) and
+\(\operatorname{vec}(B\,A)=(A^{\top}\!\otimes\!I)\operatorname{vec}B\).
+Define
+\[
+\tilde z^{\mu}:=\operatorname{vec}\bigl(Z^{\mu}-\bar Z\bigr),
+\qquad
+C:=\frac1N\sum_{\mu=1}^{N}\tilde z^{\mu}\tilde z^{\mu\!\top}
+      \in\mathbb R^{(d_{2}d_{0})\times(d_{2}d_{0})}.
+\]
+Then
+\[
+\operatorname{vec}(\Delta^{1}_{\mu})=2\,(I_{d_{0}}\!\otimes\!W^{2\!\top})\tilde z^{\mu},
+\qquad
+\operatorname{vec}(\Delta^{2}_{\mu})=2\,(W^{1}\!\otimes\!I_{d_{2}})\tilde z^{\mu}.
+\]
+
+\paragraph{Gradient–noise covariance.}
+Stack \(\operatorname{vec}(\Delta^{1}_{\mu})\) over \(\operatorname{vec}(\Delta^{2}_{\mu})\) and average:
+\[
+\Sigma
+  =\frac1N\sum_{\mu=1}^{N}
+  \begin{bmatrix}
+      \operatorname{vec}(\Delta^{1}_{\mu})\\[2pt]
+      \operatorname{vec}(\Delta^{2}_{\mu})
+  \end{bmatrix}
+  \begin{bmatrix}
+      \operatorname{vec}(\Delta^{1}_{\mu})\\[2pt]
+      \operatorname{vec}(\Delta^{2}_{\mu})
+  \end{bmatrix}^{\!\top}.
+\]
+
+Insert the vectorised forms:
+\[
+\boxed{\;
+\Sigma=
+4\;
+\begin{bmatrix}
+I_{d_{0}}\!\otimes\!W^{2\!\top}\\[2pt]
+W^{1}\!\otimes\!I_{d_{2}}
+\end{bmatrix}
+\;C\;
+\begin{bmatrix}
+I_{d_{0}}\!\otimes\!W^{2\!\top}\\[2pt]
+W^{1}\!\otimes\!I_{d_{2}}
+\end{bmatrix}^{\!\top}}
+\]
+
+\noindent
+Hence the four blocks are
+\[
+\begin{aligned}
+\Sigma^{11}&=4\,(I_{d_{0}}\!\otimes\!W^{2\!\top})\,C\,(I_{d_{0}}\!\otimes\!W^{2\!\top})^{\!\top},\\[4pt]
+\Sigma^{22}&=4\,(W^{1}\!\otimes\!I_{d_{2}})\,C\,(W^{1}\!\otimes\!I_{d_{2}})^{\!\top},\\[4pt]
+\Sigma^{12}&=4\,(I_{d_{0}}\!\otimes\!W^{2\!\top})\,C\,(W^{1}\!\otimes\!I_{d_{2}})^{\!\top},
+\qquad
+\Sigma^{21}=\Sigma^{12\!\top}.
+\end{aligned}
+\]
+
+\paragraph{Interpretation.}
+*The entire gradient-noise covariance is obtained from the*  
+outer-product covariance \(C\) of the centred matrices
+\(Z^{\mu}=r^{\mu}x^{\mu\!\top}\) *and two simple linear maps*
+\(I_{d_{0}}\!\otimes\!W^{2\!\top}\) *and* \(W^{1}\!\otimes\!I_{d_{2}}\).
+\subsection{Hessian}
+
+\subsection{SDE}
+
+\subsection{Plan}
+Motivation is to look into different assumptions about SDEs on DLNs. We can try to derive analytic results on DLNs. For this we need to compute the following:
+\begin{itemize}
+    \item Find critical points of the loss functions 
+    \item Compute the Covariance of the Gradient Noise
+    \item Compute the Hessian of the loss function
+    \item Compute the stationary distribution of the Langevin SDE of the DLNs
+    \item Compute the noise covariance matrix of SGD
+    \item Compute escape time around saddle points 
+    \item Compute mixing time around saddle points
+\end{itemize}
+\section{Empirical results on DLNs}
+Qualitative results that we want to get on DLNs:
+Some stuff around the gradient noise and finite learning rate:
+\begin{itemize}
+    \item Gradient noise is anisotropic.
+    \item Gradient noise is heavy tailed.
+    \item Finite learning rate capture some different dynamics than the continuous limit (edge of stability) e.g. by changing escape times and mixing times.
+    \item Gradient noise is correlated with the Hessian of the loss function and the loss function itself. When does this correlation break down?
+\end{itemize}
+Around non-strict saddle points:
+\begin{itemize}
+    \item Check Escape time: look into extention of Kramers rate theory. Rates might follow a power law for ex.
+    \item Check mixing time along degenerate directions: can we find the stationary distribution of the SDE and compare it with the distribution of SGD?
+    \item Look at transitions between different saddle points: estimate probability of escaping from one saddle point to another in a given time, get some transition Kernel.
+    \item Higher order statistics of SGD trajectories.
+    \item Can look at SDEs at different scales i.e. different distances from the saddles points. Different SDEs might be more or less valid at different scales.
+\end{itemize}
+More specifically, we want to test which SDE better captures the dynamics of SGD around non-strict saddle points. So we can compare empirically the behaviour of the SDE arou   nd non-strict saddle points with the behaviour of SGD around non-strict saddle points. Escape times and mixing times might be good indicators to track if we can compute them on DLNs and test with empirics.
+\\
+\\
+For example, one conjecture would be that heavy-tailness around non-strict saddle better capture the escape dynamics of SGD. Perhaps we can compute the probability of escaping from one critical point to another in a given time.
+\section{Effect of noise anisotropy on non strict saddle points}
+What we need to know:
+\begin{itemize}
+    \item Finding non-strict saddle points in DLNs.
+    \item Dependency of the noise on the curvature (e.g. via Hessian)
+    \item Get some conjecture on escape and mixing time around non-strict saddle
+\end{itemize}
+\textbf{Def (non-strict saddle point):} A non-strict saddle point is a critical point such that the Hessian has a zero eigenvalue and at least one negative eigenvalue (i.e. strict saddle point with a flat direction).
+\\
+\textbf{Def (escape time):} We want to find the escape time around a non-strict saddle point. Mathematically, let $\theta^*$ be a non-strict saddle point. We are interested in the escape time i.e. the time it takes for the trajectory to escape from the saddle point toward lower losses regions.
+\begin{align}
+    \tau_r = \inf\{t > 0: L(\theta^*) - L(\theta(t)) > \epsilon\}
+\end{align}
+In the following paper \href{https://arxiv.org/pdf/2105.09557#page=5.74}{on escape time of SGD}, the authors derive an expression for the escape time around a non-strict saddle point under a few assumptions: params. obey the quasi-stationary distribution around critical points, escape from critical point is dominated by most probable escape path (whose direction is given by some eigen value of the Hessian), SGD dynamics is restricted to the non zero eigen value of the Hessian (which forms a lower subspace of the loss). In such case the escape rate obeys a power law given by:
+\[
+\tau_r \sim 
+\frac{\sqrt{\,h_e^{*}\,|h_e^{s}|\,}}{2\pi}\,
+\left[\frac{L(\theta^{s})}{L(\theta^{*})}\right]^{
+\left(\frac{B}{\eta\,h_e^{*}} + 1 - \frac{n}{2}\right)}
+\]
+For the Langevin SDE, the escape time is given by the Kramers law where:
+\begin{align}
+    <\tau> \sim \exp[-\beta\frac{\Delta L}{\sigma^2}]
+\end{align}
+(Note check if temperature is there)
+Empirically, we could check the escape time of SGD, Langevin and power law by estimating the time it takes for the trajectory to go from one saddle point to another. In DLNs, Find the first time at which the loss starts to plateau and the time it takes to escape the plateau. Take the same seed and average over many runs. We can plot the log of escape time with respect to $\log\Delta L$ and with respect to $\Delta \log L$. If anisotropy is present we should observe a power law as opposed to a linear relationship.
+
+We could also look at the mixing time around a non-strict saddle point. Mathematically, let $\theta^*$ be a non-strict saddle point. We are interested in the mixing time i.e. the time it takes for the trajectory to mix around the saddle point.
+
+\subsection{Escape time for Langevin SDE}
+At a local minimum, we define the escape time of SGD as the exit time to escape the local minimum.
+\begin{align}
+    \tau_r = \inf\{t > 0: |L_N(\theta(t)) - L_N(\theta^*)| > \epsilon\}
+\end{align}
+We model SGD as a Langevin SDE. 
+
+
+
+
 \section{\textbf{TODO}}
 \begin{itemize}
     \item \sout{Explain why we care about continuous-time limit and connection with the tempered posterior distribution (also mention invertability of the noise covariance)}
