@@ -1,0 +1,164 @@
+\documentclass[11pt]{article}
+\usepackage{natbib}
+\usepackage[margin=0.5in]{geometry}  
+\geometry{a4paper, margin=1in}
+\usepackage{comment} % for comments
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{hyperref}
+\usepackage{graphicx}
+% Required packages for algorithms
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage[normalem]{ulem}
+
+% --------------------------------------------------
+% Extra packages required by the protocol
+% --------------------------------------------------
+\usepackage{booktabs}   % professional tables
+\usepackage{enumitem}   % compact lists
+\usepackage{siunitx}    % scientific notation
+\usepackage{physics}    % \dv, \pdv, etc.
+
+% Custom macros used in the protocol
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Wteacher}{\ensuremath{W_{\mathrm{teacher}}}}
+\newcommand{\Wi}{\ensuremath{W_i}}
+\newcommand{\Wprod}{\ensuremath{W_N\cdots W_1}}
+
+\begin{document}
+\section*{Experiments to show low rank bias of Gradient Descent (GD)}
+The simplest is to start with understanding the implicit biases of GD. One implicit bias of GD is that it is biased toward low rank solutions. This has been shown in deep linear networks by Saxe et al. 2014 studying the exact solutions of gradient flow in deep linear networks.
+Main implicit biases (see \href{https://claude.ai/public/artifacts/c54b85ba-9f9b-4d01-8407-2e3a3ab4639b}{deep research}):
+\begin{itemize}
+    \item Low rank solutions and first learns largest eigenvalues. For ex see \href{https://arxiv.org/pdf/2011.13772}{paper}.
+    \item Avoiding sharp minima thanks to edge of stability.
+    \item Feature averaging; \href{https://arxiv.org/pdf/2410.10322}{here}
+    \item Spectral bias: learning low frequency features first \href{https://arxiv.org/pdf/1806.08734}{paper}
+    \item Directional convergence of normalized weights and alignment of gradient with weights. Also implicit bias toward max margin solutions \href{https://arxiv.org/pdf/2006.06657}{paper}
+    \item Conjecture: the gradient updates are themselves low rank?
+\end{itemize}
+Most interesting to look into are: low rank solutions, learning more important features first, edge of stability and checking GD vs Gradient flow (continuous time limit of GD). Another important paper is the saddle-to-saddle dynamics of GD by Jacot et al.
+
+\subsection*{Experimental Protocol: Implicit Bias Toward Low-Rank Solutions}
+\label{sec:prot}
+
+\paragraph{Overview.}
+This protocol empirically demonstrates that gradient‐based optimization favours low‐rank solutions when fitting a low‐rank target matrix.  Both discrete-time \emph{gradient descent} (GD) and its continuous‐time limit \emph{gradient flow} (GF) are tested across network depths, initializations, and learning rates.
+
+% --------------------------------------------------
+\subsubsection*{Network Architecture}
+
+\paragraph*{Teacher (Target) Network.}
+\begin{itemize}[nosep]
+  \item Dimension: \(n = 100\) with square matrices. If dimension is too large, use smaller matrices to run quicker experiments, can also use rectangular matrices. The important part is having a deep teacher and student network in the overparameterized regime.
+  \item Rank, for example: \(r \in \{5,10,20\}\).
+  \item Generate Teacher network of Depth N
+\end{itemize}
+
+\paragraph*{Student (Overparameterized) Network.}
+\begin{itemize}[nosep]
+  \item Deep \emph{linear} network: \(\Wprod\)
+  \item Depth \(N\ge2\); the model is overparameterized for any \(N\ge2\).
+\end{itemize}
+
+% --------------------------------------------------
+\subsubsection*{Initialization (Saddle–to–Saddle Regime)}
+\label{sec:init}
+\begin{enumerate}
+  \item \textbf{Gaussian:} \(\Wi \sim \mathcal{N}\!\bigl(0,\sigma^2\bigr)\) with $\sigma=w^{-\gamma}$ with $w$ the width of the given layer and $\gamma>1$ (see saddle-to-saddle dynamics by Jacot et al. for more details).
+\end{enumerate}
+
+% --------------------------------------------------
+\subsubsection*{Training Setup}
+
+\paragraph*{Mean square error Loss.}
+\[
+  \mathcal{L} = \tfrac12 \norm{\Wprod - \Wteacher}_F^{2}.
+\]
+
+\paragraph*{Optimizers.}
+\begin{itemize}[nosep]
+  \item \textbf{Gradient Descent (GD):}\quad
+        \(\Wi^{(t+1)} = \Wi^{(t)} - \eta\,\pdv{\mathcal{L}}{\Wi}\),
+        \(\eta \in \{10^{-4}, 10^{-3}, 10^{-2}\}\).
+  \item \textbf{Gradient Flow (GF):}\quad
+        \(\dv{\Wi}{t} = -\,\pdv{\mathcal{L}}{\Wi}\);
+        approximate with GD using smaller \(\eta_{\text{flow}}\). Use Runge-Kutta 4th order method to approximate the flow.
+\end{itemize}
+
+% --------------------------------------------------
+\subsubsection*{Metrics}
+
+\paragraph*{Rank‐related quantities.}
+Let $\norm{W}_*$ be the nuclear norm of $W$ (sum of singular values) and $\norm{W}_F$ be the Frobenius norm. In addition to tracking rank via non zero singular values, we also track the effective rank, the stable rank. The latter grow more smoothly and show the incremental dynamics of the rank a bit better.
+\begin{align*}
+  r_{\mathrm{eff}}(W) &= \frac{\norm{W}_*}{\norm{W}}, &
+  r_{\mathrm{stable}}(W) &= \frac{\norm{W}_F^2}{\norm{W}^2}, &
+  r_{\mathrm{num}}(W) &= \#\{\sigma_i > 10^{-6}\}.
+\end{align*}
+
+\paragraph*{Tracked every iteration.}
+\begin{itemize}[nosep]
+  \item Layer ranks \(r(\Wi)\), product rank \(r(\Wprod)\).
+  \item Singular values of \(\Wprod\).
+  \item Training loss \(\mathcal{L}\).
+  \item Alignment of learned vs.\ teacher singular vectors (i.e. their angles, scalar product)
+\end{itemize}
+
+% --------------------------------------------------
+\subsubsection*{Experimental Procedure}
+
+\begin{enumerate}[nosep]
+  \item Initialize network per Section~\ref{sec:init}.
+  \item For example, train for \num{10\,000}–\num{50\,000} iterations (until convergence). \textbf{Important: also use iterations instead of epochs to show the incremental dynamics.}
+  \item Log metrics every 10–50 iterations; save checkpoints every 1000 iterations.
+\end{enumerate}
+
+\paragraph*{GD vs.\ GF comparison.}
+Use identical initializations; for GF pick a small step size and plot against continuous time \(t = \eta \times \text{iteration}\). Compare rank dynamics and loss convergence for both. Run the comparison for different learning rates across different order of magnitude.
+
+\paragraph*{Parameter sweeps.}
+Keep initialization fixed. These are examples of parameters to sweep:
+\[
+  r\!\in\!\{5,10,20\},\;
+  N\!\in\!\{2,3,4,5\},\;
+  \eta\!\in\!\{10^{-4},10^{-3},10^{-2}\}.
+\]
+
+% --------------------------------------------------
+\subsubsection*{Visualizations}
+
+\begin{enumerate}[label=\textbf{\arabic*.},leftmargin=*,nosep]
+  \item \textbf{Effective rank evolution:} \(r_{\mathrm{eff}}(\Wprod)\) vs.\ iteration/\(t\).
+  \item \textbf{Singular value dynamics:} log–linear plot of all \(\sigma_i(t)\).
+  \item \textbf{Layer‐wise rank:} subplots of each \(r(\Wi)\) over time.
+  \item \textbf{Loss convergence:} \(\mathcal{L}\) vs.\ iteration (log scale).
+\end{enumerate}
+
+% --------------------------------------------------
+\subsubsection*{Expected Results}
+
+\begin{itemize}[nosep]
+  \item Discrete rank “plateaus’’ at 1,2,\dots,\(r\).
+  \item Larger singular values converge first (bias toward important features first).
+  \item GF shows smoother transitions than GD.
+  \item Deeper networks exhibit stronger low-rank bias.
+\end{itemize}
+
+% --------------------------------------------------
+\subsubsection*{Implementation Notes}
+
+\paragraph*{Reproducibility.}
+Fix random seeds, log hyperparameters, and version-control code.
+
+% --------------------------------------------------
+\subsubsection*{Optional Extensions}
+
+\begin{enumerate}[label=\textbf{\Alph*.},leftmargin=*,nosep]
+  \item \textbf{Lazy (NTK) regime:}
+  \item \textbf{Rectangular matrices:} \(\Wteacher\in\R^{m\times n}\); track singular values.
+\end{enumerate}
+
+\end{document}

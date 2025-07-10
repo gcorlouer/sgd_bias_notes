@@ -1,0 +1,514 @@
+\documentclass[11pt]{article}
+\usepackage{natbib}
+\usepackage[margin=0.5in]{geometry}  
+\geometry{a4paper, margin=1in}
+\usepackage{comment} % for comments
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{hyperref}
+\usepackage{graphicx}
+% Required packages for algorithms
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage[normalem]{ulem}
+
+\begin{document}
+Content:
+\begin{itemize}
+    \item Inductive biases of gradient descent: low rank bias in DLNs, edge of stability and other phenomena 
+    \item Langevin model of SGD: SGD as approximate Bayesian inference
+    \item Anisotropic noise introduced implicit regularization that enables to learn sparse solutions
+    \item Stochasticity plays a role: degeneracies are sticky for SGD
+    \item Comparing different models of SGD: what statistics to track?
+    \item Escape time around local mimima: Kramers
+    \item SGD on low loss converges toward more degenerate solutions
+    \item Metastability: no work on this yet for saddle to saddle dynamics and degenerate models?
+    \item Mixing times: how to study it?
+    \item Limits to SDE models of SGD (large learning rate)
+    \item Alternative approaches to SGD: 
+    \item Q. what do we want from SGD, especially for safety?
+\end{itemize}
+
+\section*{Some related work on inductive biases of SGD (emphasis on anisotropic noise)}
+This is a shallow review where I write the results that seem most salient, it's not a comprehensive review. First, let's start with the inductive biases of gradient descent flow. In the continuous limit, gradient flow writes:
+\begin{equation}
+    \dot{\theta} = -\nabla L_N(\theta)
+\end{equation}
+One central result comes from the exact study of gradient flow on deep linear networks (DLNs). In such a setting it has been shown that gradient descent has an implicity bias towards low rank solutions \citep{saxe2013exact}. It has also been shown that in deep learning, GD works at the edge of stability \citep{cohen2021gradient}. The edge of stability means that GD is implicitly aware of the curvature by escaping sharp minima with curvature above $\frac{2}{\eta}$, where $\eta$ is the learning rate. This can be seen by looking at the maximum eigenvalue of the Hessian during the training process. In other words, there is some flatness bias during gradient descent. In the continuous limit, the edge of stability behaviour can be modelled with a central flow term \citep{cohen2024understanding}. We can write the continuous limit as:
+
+%--------------------------------------------------------------------
+% REQUIREMENTS
+% \usepackage{amsmath,amssymb}
+%--------------------------------------------------------------------
+
+\[
+\boxed{%
+  \frac{d \theta}{d t}
+  = -\,\eta\!\left(
+      \nabla L(\theta)
+      \;+\;\frac{1}{2}\,
+      \nabla_{\theta}\,\bigl\langle H(\theta),\Sigma(t)\bigr\rangle
+    \right)}    
+\]
+Where $H$ is the Hessian matrix, $\Sigma(t) = \mathbb{E}[(\theta_{t}-\theta(t))(\theta_{t}-\theta(t))^{\!\top}]$ is the covariance of fast oscillations.
+Another interesting bias that has been noted in deep linear networks it a bias toward aligning the weight matrix of neural networks: during GD, layers become aligned \citep{ji2018gradient}. This can be seen by showing that the scalar product between left and right singular vectors tend to 1 in the long time limit. Another interesting bias is a bias toward learning low frequency solutions first \citep{xu2024overview}.
+\\
+\\
+Beyond the inductive biases of GD, the stochasticity in SGD induces other inductive biases. By modelling SGD as a Langevin dynamics with anisotropic noise (ALD):
+
+\begin{equation}
+    \dot{\theta}(t) = -\nabla L_N(\theta(t)) + \sqrt{2\eta\Sigma(\theta(t))} dW(t)
+\end{equation}
+where $W(t)$ is a Brownian motion. We can see that noise anisotropy can shrink parameters on degenerate critical directions.
+
+Some previous work suggest that SGD has a bias toward solution that generalize better than GD. In diagonal linear networks, it has been shown that SGD induces sparser solutions than GD by minimizing an implicit objective function inducing sparser parameters \citep{pesme2021implicit}. Some other work in rank 1 over-parameterized deep linear networks suggests that SGD is less dependent on initialization than GD \citep{lyu2023implicit}. Modelling the noise of ALD as a labelled noise in 2 layers LNs, it has been shown that SGD induces a further bias toward low rank solutions\citep{varre2024sgd}:
+
+% ================================================================
+%  Label-noise stochastic gradient algorithms and determinant laws
+% ================================================================
+
+% ---------- Label-noise SGD (discrete-time) ----------------------
+\begin{equation}\label{eq:lsgd}
+    \Theta_{t+1}
+    \;=\;
+    \Theta_t
+    \;-\;
+    \eta\,\Theta_t J_t
+    \;-\;
+    \eta\sqrt{\delta}\,\Theta_t \,\xi_t ,
+\end{equation}
+%
+where
+\[
+    J_t=
+    \begin{bmatrix}
+        \mathbf{0}_{p\times p} & X^{\!\top}\!\bigl(Y-XW_{1,t}W_{2,t}\bigr) \\
+        \bigl(X^{\!\top}\!\bigl(Y-XW_{1,t}W_{2,t}\bigr)\bigr)^{\!\top} & \mathbf{0}_{k\times k}
+    \end{bmatrix},
+    \qquad
+    \xi_t=
+    \begin{bmatrix}
+        \mathbf{0}_{p\times p} & X^{\!\top}\varepsilon_t \\
+        \varepsilon_t^{\!\top}X & \mathbf{0}_{k\times k}
+    \end{bmatrix},
+\]
+and the label-noise satisfies $\varepsilon_t\sim\mathcal N(\mathbf 0,\mathbf I_{n\times k})$.
+
+% ---------- Label-noise stochastic gradient flow (continuous-time) ----
+\begin{equation}\label{eq:sgf}
+    \mathrm d\Theta
+    \;=\;
+    \Theta\!\left[\,J\,\mathrm dt
+                  +\sqrt{\eta\delta}\,\mathrm d\xi\right],
+\end{equation}
+with $\mathrm d\xi$ sharing the same block structure as $\xi_t$ but driven by Brownian motion.
+
+% ---------- Determinant dynamics: Gradient Descent ---------------
+\begin{equation}\label{eq:gd-det}
+    \frac{\mathrm d}{\mathrm dt}\;
+    \det\!\bigl(\Theta^{\!\top}\Theta\bigr)
+    \;=\;0,
+\end{equation}
+
+% ---------- Determinant dynamics: Stochastic Gradient Descent ----
+\begin{equation}\label{eq:sgd-det}
+    \frac{\mathrm d}{\mathrm dt}\;
+    \det\!\bigl(\Theta^{\!\top}\Theta\bigr)
+    \;=\;
+    -\,2\eta\delta\,k\,\operatorname{tr}\!\bigl(X^{\!\top}X\bigr)\,
+      \det\!\bigl(\Theta^{\!\top}\Theta\bigr),
+\end{equation}
+whose explicit solution is
+\[
+    \det\!\bigl(\Theta(t)^{\!\top}\Theta(t)\bigr)
+    \;=\;
+    \det\!\bigl(\Theta_0^{\!\top}\Theta_0\bigr)\,
+    \exp\!\Bigl[-2\eta\delta\,k\,\operatorname{tr}(X^{\!\top}X)\,t\Bigr].
+\]
+The noise in ALD diminishes the determinant along the trajectory, leading to a simplification of the network over time. The larger
+the noise and the stepsize, the faster the determinant vanishes. The vanishing of the determinant
+suggests that the rank of the parameters decreases by at least one, effectively eliminating some
+components. Note: we could look into sub-determinants of the dynamics. Even though we have a stochastic process, the determinant satisfies a deterministic differential equation.
+
+% --------------------------------------------------------------
+%  SGD bias toward sparse feature learning  —  after Lochrie et al.
+% --------------------------------------------------------------
+\paragraph{SGD as GD plus label noise.} In another paper, it has been shown that SGD can induces a bias toward sparse feature in diagonal linear networks using a labelled noise model of the noise \citep{andriushchenko2023sgd}.
+For a mini-batch of size 1, the standard update
+\begin{equation}
+  \theta_{t+1}
+  =\;
+  \theta_t\;-\;\eta\,
+  \bigl(h_{\theta_t}(x_{i_t})-y_{i_t}\bigr)\,
+  \nabla_\theta h_{\theta_t}(x_{i_t})
+  \label{eq:sgd}
+\end{equation}
+can be rewritten exactly as \emph{full–batch} GD on \emph{corrupted labels}
+$\tilde y_{t,i}=y_i+\xi_{t,i}$:
+\begin{equation}
+  \theta_{t+1}
+  =\;
+  \theta_t\;-\;
+  \frac{\eta}{n}
+  \sum_{i=1}^{n}
+  \bigl(h_{\theta_t}(x_i)-\tilde y_{t,i}\bigr)\,
+  \nabla_\theta h_{\theta_t}(x_i),
+  \qquad
+  \xi_{t,i}
+  \;=\;
+  \bigl(h_{\theta_t}(x_i)-y_i\bigr)\,
+  \bigl(1-n\,\mathbf 1_{\{i=i_t\}}\bigr).
+  \label{eq:sgd-as-gd+noise}
+\end{equation}
+The label-noise is mean-zero and its variance scales with the instantaneous empirical loss,
+$\mathbb E\!\left[\|\xi_t\|^2\right]=2n(n-1)L(\theta_t)$, so the noise naturally
+\emph{vanishes at convergence} and is largest when the model is still far from fitting the data
+\citep{lochrie2025sgd}.  \\[-0.6em]
+
+\paragraph{Effective SDE on the loss plateau.}
+When a large learning-rate causes the training loss to stabilise at some plateau
+$L(\theta_t)\simeq\delta>0$, the discrete dynamics
+(\ref{eq:sgd-as-gd+noise}) is well approximated (in the Stratonovich sense) by
+\begin{equation}
+  \boxed{\;
+    \mathrm d\theta_t
+    \;=\;
+    -\,\nabla_\theta L(\theta_t)\,\mathrm dt
+    \;+\;
+    \sqrt{\eta\,\delta}\;
+      \Phi_\theta(X)^{\!\top}\mathrm dB_t
+  \;}
+  \label{eq:plateau-sde}
+\end{equation}
+where
+
+\begin{itemize}\setlength\itemsep{0.2em}
+  \item $L(\theta)=\tfrac12\sum_{i=1}^n\bigl(h_\theta(x_i)-y_i\bigr)^2$
+        is the empirical loss,
+  \item $\Phi_\theta(X)=\bigl[\nabla_\theta h_\theta(x_1),\dots,
+        \nabla_\theta h_\theta(x_n)\bigr]^{\!\top}\!\in\mathbb R^{n\times\dim(\theta)}$
+        is the Jacobian (a.k.a. NTK feature matrix),
+  \item $B_t$ is an $n$-dimensional Brownian motion,
+  \item $\delta\simeq L(\theta_t)$ is (approximately) constant along the plateau.
+\end{itemize}
+
+Because the noise lies in the \emph{same span} as the gradients,
+it systematically pushes the parameters toward directions that also reduce the loss,
+yielding an implicit preference for “simpler’’ (sparser) representations.  \\[-0.6em]
+
+\paragraph{Diagonal linear network: explicit calculation.}
+Consider the two-layer \emph{diagonal linear} model
+$h_{u,v}(x)=\langle u\!\odot v,x\rangle$ with
+$\theta=(u,v)\in\mathbb R^d\times\mathbb R^d$.  On the plateau,
+(\ref{eq:plateau-sde}) becomes coordinate-wise
+\begin{equation}
+  \mathrm d u_t
+  \;=\;
+  -\,\nabla_{u}L(u_t,v_t)\,\mathrm dt
+  \;+\;
+  \sqrt{\eta\,\delta}\;
+    v_t\!\odot\!X^{\!\top}\mathrm dB_t,
+  \qquad
+  \mathrm d v_t
+  \;=\;
+  -\,\nabla_{v}L(u_t,v_t)\,\mathrm dt
+  \;+\;
+  \sqrt{\eta\,\delta}\;
+    u_t\!\odot\!X^{\!\top}\mathrm dB_t,
+  \label{eq:diag-lin-sde}
+\end{equation}
+where $X=[x_1,\dots,x_n]^{\!\top}$.  
+Lochrie \emph{et al.}\ show that:
+\begin{enumerate}\setlength\itemsep{0.2em}
+  \item if feature~$j$ is \emph{off-support} ($u_j^\star v_j^\star=0$ in the ground truth),
+        then $|u_{t,j}|$, $|v_{t,j}|$ shrink exponentially fast;
+  \item for on-support coordinates, $(u_{t,j},v_{t,j})$ stay inside an
+        $O\!\bigl(\sqrt{\eta\,\delta}\bigr)$ band and converge (in $O(\delta^{-1})$ time)
+        to the \emph{sparsest} interpolator.
+\end{enumerate}
+Thus, the multiplicative noise operates as a \emph{soft $\ell_0$ penalty} that prunes irrelevant
+features during the plateau. The multiplicative structure $\phi_\theta(X)^{!\top}\mathrm dB_t$ makes the noise amplitude self-proportional to each feature’s strength. That converts the stochastic term into a geometric Brownian motion acting on every column norm, whose intrinsic negative drift drives unnecessary features toward zero while leaving only those columns that the gradient term must keep alive to fit the data. The result is the systematic sparsification observed across architectures. \\[-0.6em]
+
+\paragraph{Conjecture — general sparse-feature learning.}
+Because the stochastic term in (\ref{eq:plateau-sde}) always lives in
+$\operatorname{span}\bigl\{\nabla_\theta h_\theta(x_i)\bigr\}_{i=1}^n$,
+it is expected to minimise the $\ell_2$ column norms of $\Phi_\theta(X)$,
+thereby promoting \emph{Jacobian sparsity} irrespective of architecture.
+Empirically, Lochrie \emph{et al.}\ observe a sharp drop in both
+\emph{feature-sparsity coefficient} and the rank of $\Phi_\theta(X)$ across
+diagonal linear nets, shallow ReLU MLPs, ResNets and DenseNets once training
+enters the loss plateau.  We conjecture that this \emph{multiplicative-noise
+sparsification} is a universal inductive bias of SGD at large learning rates.
+
+\paragraph{Implicit simplification by \textbf{stochastic collapse} \citep{chen2023stochastic}}
+\vspace{-0.4em}
+\begin{enumerate}\setlength\itemsep{2pt}
+  \item \textbf{SGD as SGF:}
+        \[
+          \boxed{%
+            \mathrm d\theta_t=-\nabla L(\theta_t)\,\mathrm dt
+            +\sqrt{\tfrac{\eta}{\beta}}\;\Sigma(\theta_t)\,\mathrm dB_t
+          } \tag{SC\;1}
+        \]
+        where \(\Sigma\) is the square-root covariance of per-sample gradients.
+  \item \textbf{Invariant sets.}  
+        Sign sets \(w_{\text{in}}=w_{\text{out}}=0\) (sparsity) and permutation sets
+        \(w_{\text{in},p}=w_{\text{in},q},\;w_{\text{out},p}=w_{\text{out},q}\) (rank-reduction)
+        satisfy \(Q\theta=\theta\) for a reflection matrix \(Q\).
+  \item \textbf{Attractivity criterion (1-D):}
+        Near \(A=\{0\}\)
+        \(\mathrm d\theta_t\!\simeq\!-L''(0)\theta_t\,\mathrm dt+\sqrt{D''(0)}\theta_t\,\mathrm dB_t\);
+        stochastic attraction occurs iff
+        \[
+          \boxed{L''(0)+\tfrac12 D''(0)>0} \tag{SC\;2}
+        \]
+        so stronger noise broadens the set of attractive curvatures.
+  \item \textbf{Sign-set example:}
+        For \(f(x)=w_2\sigma(w_1x)\) under label-noise \((\zeta)\) SGD,
+        \[
+          A=\{w_1=w_2=0\}\ \text{is attractive if}\ 
+          \frac{\sigma'(0)\eta\zeta^2}{2}\;>\;
+          \frac{\lvert\sum_i x_i y_i\rvert}{\sum_i x_i^2}. \tag{SC\;3}
+        \]
+  \item \textbf{Rank-collapse SDE (teacher--student):}
+        \[
+          \boxed{\;
+          \mathrm ds_i
+            =2s_i\bigl((\tilde s_i+\tfrac12\eta\zeta^{2})-s_i\bigr)\mathrm dt
+            +2\sqrt{\eta\zeta^{2}}\,s_i\,\mathrm dB_t
+          \;} \tag{SC\;4}
+        \]
+        Modes with \(\tilde s_i<\eta\zeta^{2}/2\) shrink to zero, yielding a low-rank bias.
+\end{enumerate}
+% -------------------------------------------------------------
+%  PDE view of SGD — key results (Barbieri–Bonforte–Ibarrondo, 2025)
+% -------------------------------------------------------------
+\paragraph{SGD $\Longrightarrow$ degenerate SDE from \citep{barbieri2025pdesgd}}
+Mini-batch SGD with learning-rate $\eta$ and batch-size $b$ is the Euler–Maruyama
+scheme of the \emph{state-dependent} SDE
+\begin{equation}
+  dX_t = -\nabla L(X_t)\,dt
+          +\sqrt{\tfrac{\eta}{b}}\;Q(X_t)^{1/2}\,dW_t,
+  \qquad
+  \varepsilon^{2}:=\frac{\eta}{2b},
+\end{equation}
+where $Q(x)=\mathrm{cov}\!\bigl[\nabla L_i(x)\bigr]\succeq0$ is typically \textbf{degenerate}
+(rank $\le N-1<d$ in the over-parameterised regime).
+
+\paragraph{Fokker–Planck formulation.}
+The transition density $\rho(t,x)$ obeys
+\begin{equation}
+  \partial_t\rho
+  =\nabla\!\cdot\!\bigl(
+      \varepsilon^{2}\nabla\!\cdot(Q\rho)
+      +\rho\nabla L
+    \bigr).
+\end{equation}
+
+\begin{enumerate}\setlength\itemsep{4pt}
+%--------------------------------------------------------------
+\item \textbf{Drift regime – Local mass concentration.}  
+      If $L$ is $\lambda$–convex in $B_{(1+\delta)R_0}$ and $0\le Q\preceq\sigma I$, then\,\cite[Thm.\;1.2]{}  
+      \[
+        \boxed{\;
+          \int_{\!|x|\le R_0e^{-\frac\lambda2(t-t_0)}}\!\!\rho(t,x)\,dx
+          \;\ge\;
+          \int_{\!|x|\le R_0}\!\rho(t_0,x)\,dx
+          \;-\;\beta
+        \quad\text{for }0<t<t_0+T_\varepsilon
+        \;}
+      \]
+      with $T_\varepsilon=\tfrac{2}{\lambda}\log\!\bigl(\tfrac{R_0}{a\varepsilon^{\alpha}}\bigr)$.
+      Hence small effective noise keeps most probability mass near the nearest
+      minimum for an \emph{exponentially long} time in $\varepsilon$.
+
+%--------------------------------------------------------------
+\item \textbf{Diffusion regime – Mean Exit Time (MET).}  
+      For a ball $B_{R_0}(x_0)$ and any $r<R_0$:
+      \begin{align}
+        \underline{\text{Lower bound:}}\quad&
+        \mathbb E[\tau_{x}^{B_{R_0}}]
+        \;\ge\;
+        \frac{R_0^{2}-r^{2}}{2\varepsilon^{2}\sigma d},\\
+        \underline{\text{Upper bound:}}\quad&
+        \mathbb E[\tau_{x}^{\Omega}]
+        \;\le\;
+        \frac{2}{\Lambda}\!\left(
+          e^{\frac{\Lambda R_v^{2}}{2\beta\varepsilon^{2}}}
+          -e^{\frac{\Lambda r^{2}}{2\beta\varepsilon^{2}}}
+        \right)
+        \quad
+        \bigl(\text{if }v^{\!\top}Qv\ge\beta>0
+               \text{ and }(v\!\cdot\!\nabla L)(v\!\cdot\!x)\le\Lambda(v\!\cdot\!x)^{2}
+        \bigr).
+      \end{align}
+      Even very degenerate noise gives finite escape times as soon as it is non-zero in
+      \emph{one} direction.
+
+%--------------------------------------------------------------
+\item \textbf{Steady-state existence for degenerate $Q$.}  
+      If $Q$ is globally bounded and Lipschitz (9) and $L$ is coercive and
+      one-sided Lipschitz (10)–(11), there exists an invariant probability
+      $\rho_\infty$ solving
+      \[
+        \boxed{%
+          \nabla\!\cdot\!\bigl(
+            \varepsilon^{2}\nabla\!\cdot(Q\rho_\infty)
+            +\rho_\infty\nabla L
+          \bigr)=0
+        } 
+      \]
+
+%--------------------------------------------------------------
+\item \textbf{Convergence to equilibrium.}  
+      \emph{(i) Noisy-SGD:} adding an isotropic $\delta I$ to $Q$ yields a
+      uniformly elliptic SDE whose law converges (qualitatively) to the unique
+      steady state via the duality method.
+      \emph{(ii) Constant–$Q_0$, quadratic $L$:}  
+      if $C$ is positive stable and $\ker Q_0$ satisfies Hörmander’s
+      condition, the relative entropy decays exponentially
+      \[
+        \mathcal E\bigl(\rho(t)\mid\rho_\infty\bigr)
+        \;\le\;
+        c\,e^{-2\gamma t}\,
+        \mathcal E\bigl(\rho_0\mid\rho_\infty\bigr),
+      \]
+      giving quantitative rates.  
+      \emph{(iii) Non-Hörmander block-degenerate case:} a 2-Wasserstein
+      convergence still holds, with explicit moment decay (Theorem 1.6).
+\end{enumerate}
+SGD behaves like gradient descent plus very anisotropic, state-dependent noise. Early on, that noise is too small to matter; later it becomes the key factor that lets the optimiser hop out of bad basins. How quickly it can do so—and whether it will eventually mix—depends critically on the learning-rate–to-batch-size ratio and on whether any extra, more isotropic noise is present. There are two regimes, drift and diffusion regimes. Pb is that $Q$ is degenerate, but can add some small isotropic noise to break the degeneracy then we have a convergence to an invariant distribution. Convergence to a stationary distribution is otherwise difficult.
+\section*{Escape times}
+\textbf{Def (non-strict saddle point):} A non-strict saddle point is a critical point such that the Hessian has a zero eigenvalue and at least one negative eigenvalue (i.e. strict saddle point with a flat direction).
+\\
+\textbf{Def (escape time):} We want to find the escape time around a non-strict saddle point. Mathematically, let $\theta^*$ be a non-strict saddle point. We are interested in the escape time i.e. the time it takes for the trajectory to escape from the saddle point toward lower losses regions.
+\begin{align}
+    \tau_r = \inf\{t > 0: L(\theta^*) - L(\theta(t)) > \epsilon\}
+\end{align}
+For the Langevin SDE, the escape time is given by the Kramers law where:
+\begin{align}
+    <\tau> \sim \exp[-\beta\frac{\Delta L}{\sigma^2}]
+\end{align}
+% --------------------------------------------------------------
+%  Density-diffusion view of SGD — Xie, Sato & Sugiyama (ICLR’21)
+%  REQUIRES: \usepackage{amsmath,amssymb,enumitem}
+% --------------------------------------------------------------
+From the diffusion theory of SGD \citep{xie2020diffusion}, we can derive the escape time of SGD between non degenerate minima 
+\paragraph{Hessian-aligned gradient noise.}
+Near a critical point,
+\begin{equation}
+  C(\theta)\;\approx\;\frac1B\,H(\theta),
+  \qquad
+  D(\theta)=\frac{\eta}{2B}\,H(\theta).
+  \tag{6–7}
+\end{equation}
+
+\paragraph{Continuous-time SGD.}
+\[
+  d\theta_t = -\nabla L(\theta_t)\,dt
+              +\sqrt{2D(\theta_t)}\,dW_t.
+\]
+\paragraph{Assumptions.}
+\begin{enumerate}
+  \item \textit{Second-order Taylor} around minima and saddles.
+  \item \textit{Quasi-equilibrium} inside each valley.
+  \item \textit{Low temperature} \( \varepsilon^2=\eta/2B\ll 1\).
+\end{enumerate}
+
+\paragraph{Mean escape time (SGD).}
+For a single most-probable path \(a\!\to\!b\),
+\begin{equation}
+  \boxed{%
+  \tau_{a\to b}
+    = 2\pi\,\frac{1}{|H_{b,e}|}\,
+      \exp\!\Bigl[
+        \frac{2B\,\Delta L}{\eta}
+        \Bigl(\frac{s}{H_{a,e}}+\frac{1-s}{|H_{b,e}|}\Bigr)
+      \Bigr]}
+  \tag{Thm 3.2}
+\end{equation}
+with path factor \(s\in(0,1)\).
+
+\paragraph{Corollaries.}
+\begin{itemize}
+  \item \emph{Flat-minimum bias:} $\tau$ grows like
+        $\exp\!\bigl[\tfrac{2B\,\Delta L}{\eta H_{a,e}}\bigr]$,
+        so flatter minima (small $H_{a,e}$) are exponentially more stable.
+  \item \emph{Batch / LR trade-off:} increasing $B$ or decreasing $\eta$
+        multiplies $\tau$ by $\exp\!\bigl[(B/\eta)\,\cdot\!\bigl(\ldots\bigr)\bigr]$.
+  \item \emph{Effective dimension:} only directions with large Hessian
+        eigenvalues matter, so minima with few such “outliers” survive longer.
+\end{itemize}
+In the power law escape time of SGD paper \citep{mori2022power}, the authors derive an expression for the escape time around a local minimum and saddle point under a few assumptions: parameters obey the quasi-stationary distribution around critical points, escape from critical point is dominated by most probable escape path (whose direction is given by some eigen value of the Hessian), SGD dynamics is restricted to the non zero eigen value of the Hessian (which forms a lower subspace of the loss). In such case the escape rate obeys a power law given by:
+\[
+\tau_r \sim 
+\frac{\sqrt{\,h_e^{*}\,|h_e^{s}|\,}}{2\pi}\,
+\left[\frac{L(\theta^{s})}{L(\theta^{*})}\right]^{
+\left(\frac{B}{\eta\,h_e^{*}} + 1 - \frac{n}{2}\right)}
+\]
+\paragraph{Multiplicative noise $\Rightarrow$ loss-proportional covariance.}
+
+\begin{equation}
+  \Sigma(\theta)\;\approx\;
+  \frac{2\,L(\theta)}{B}\,
+  H(\theta_\star),
+  \tag{6}
+\end{equation}
+where $H(\theta_\star)=\nabla^{2}L(\theta_\star)$ and $B$ is the batch size.
+
+\paragraph{Random-time change $\Rightarrow$ log-loss SDE.}
+
+Let $\displaystyle \tau=\!\int_{0}^{t}L(\theta_{t'})\,dt'$ and
+define $U(\theta)=\log L(\theta)$.  Then mini-batch SGD is the
+Euler–Maruyama scheme of the additive-noise SDE
+\begin{equation}
+  d\theta_\tau
+  \;=\;
+  -\,\nabla_\theta U(\theta_\tau)\,d\tau
+  +\sqrt{\frac{2\eta}{B}}\;
+    H(\theta_\star)^{1/2}\,dW_\tau ,
+  \tag{14}
+\end{equation}
+with learning rate $\eta$.
+
+\paragraph{Escape rate from a loss basin.}
+
+Under the assumptions  
+\begin{enumerate}
+  \item quasi-stationarity of the basin probability mass, and  
+  \item an “outlier” Hessian spectrum of effective dimension $n$,
+\end{enumerate}
+the transition rate to the neighbouring saddle $\theta_s$ is
+\begin{equation}
+  \boxed{%
+  \kappa\;\sim\;
+  \sqrt{\frac{h^{\star}_{e}\lvert h^{s}_{e}\rvert}{2\pi\,L(\theta_s)}}\,
+  \left(\frac{L(\theta_s)}{L(\theta_\star)}\right)^{-\!\left(
+        \dfrac{B}{\eta\,h^{\star}_{e}}+\dfrac{1-n}{2}\right)}
+  }
+  \tag{15}
+\end{equation}
+where $h^{\star}_{e}$ is the largest positive eigenvalue of
+$H(\theta_\star)$, $h^{s}_{e}<0$ the negative curvature at the saddle, and
+$n$ the number of such outlier directions.
+
+\paragraph{Stability threshold for effective dimension.}
+
+The basin remains stable only while
+\begin{equation}
+  n
+  \;<\;
+  n_{\mathrm c}
+  \;:=\;
+  2\Bigl(\tfrac{B}{\eta\,h^{\star}_{e}}+1\Bigr).
+  \tag{16}
+\end{equation}
+\textbf{Important gap:} Escape time at non-strict saddle or degenerate minima. What is the quasi-stationary distribution in that case? Also what happens when the noise is anisotropic? Another question is about mixing time in degenerate subspaces. Why do we care about escape times for safety?
+Empirically, we could check the escape time of SGD, Langevin and power law by estimating the time it takes for the trajectory to go from one saddle point to another. In DLNs, Find the first time at which the loss starts to plateau and the time it takes to escape the plateau. Take the same seed and average over many runs. We can plot the log of escape time with respect to $\log\Delta L$ and with respect to $\Delta \log L$. If anisotropy is present we should observe a power law as opposed to a linear relationship.
+
+We could also look at the mixing time around a non-strict saddle point. Mathematically, let $\theta^*$ be a non-strict saddle point. We are interested in the mixing time i.e. the time it takes for the trajectory to mix around the saddle point.
+
+\bibliographystyle{plainnat}
+\bibliography{bibliography}
+\end{document}
