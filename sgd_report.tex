@@ -87,7 +87,7 @@ The edge of stability (EoS) phenomenon, discovered by \citet{cohen2021gradient},
 
 \citet{damian2022self} provided the first rigorous mathematical explanation through self-stabilization theory. The dynamics can be captured by cubic Taylor expansion: as iterates diverge along the top Hessian eigenvector, the cubic term causes curvature to decrease until stability is restored. This creates a self-stabilizing effect where gradient descent implicitly follows projected gradient descent under the constraint $S(\theta) \leq 2/\eta$.
 
-\citet{arora2022understanding} demonstrated that EoS represents a novel mechanism of implicit regularization occurring due to non-smooth loss landscapes. The mathematical analysis shows that gradient descent updates evolve along deterministic flows on the manifold of minimum loss, contrasting with previous results that relied on infinitesimal updates or noise.
+\citet{Arora2022Understanding} demonstrated that EoS represents a novel mechanism of implicit regularization occurring due to non-smooth loss landscapes. The mathematical analysis shows that gradient descent updates evolve along deterministic flows on the manifold of minimum loss, contrasting with previous results that relied on infinitesimal updates or noise.
 
 \citet{song2023trajectory} extended the theoretical understanding through bifurcation theory, proving that different gradient descent trajectories align on specific bifurcation diagrams independent of initialization. This trajectory alignment provides rigorous mathematical foundations for both progressive sharpening and EoS phenomena. Recent extensions to stochastic settings reveal that SGD operates in ``Edge of Stochastic Stability,'' where batch sharpness rather than full-batch sharpness stabilizes at $2/\eta$.
 
@@ -109,7 +109,7 @@ The edge of stability (EoS) phenomenon, discovered by \citet{cohen2021gradient},
 
 \vspace{0.5em}
 \noindent
-\emph{Historical note:} classical work by \citet{Saxe2013Exact} already
+\emph{Historical note:} classical work by \citet{saxe2013exact} already
 captured the ``progressive sharpening'' of singular values in DLNs, but
 did not frame it in EoS terms.
 
