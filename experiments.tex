@@ -28,7 +28,7 @@
 \newcommand{\Wprod}{\ensuremath{W_N\cdots W_1}}
 
 \begin{document}
-\section*{Experiments to show low rank bias of Gradient Descent (GD)}
+\section*{Experiments to show implicit bias of Gradient Descent (GD)}
 The simplest is to start with understanding the implicit biases of GD. One implicit bias of GD is that it is biased toward low rank solutions. This has been shown in deep linear networks by Saxe et al. 2014 studying the exact solutions of gradient flow in deep linear networks.
 Main implicit biases (see \href{https://claude.ai/public/artifacts/c54b85ba-9f9b-4d01-8407-2e3a3ab4639b}{deep research}):
 \begin{itemize}
@@ -52,7 +52,7 @@ This protocol empirically demonstrates that gradient‐based optimization favour
 
 \paragraph*{Teacher (Target) Network.}
 \begin{itemize}[nosep]
-  \item Dimension: \(n = 100\) with square matrices. If dimension is too large, use smaller matrices to run quicker experiments, can also use rectangular matrices. The important part is having a deep teacher and student network in the overparameterized regime.
+  \item Dimension: \(n = 100\) with square matrices. If dimension is too large, use smaller matrices to run quicker experiments, can also use rectangular matrices. The important part is having a deep student network in the overparameterized regime.
   \item Rank, for example: \(r \in \{5,10,20\}\).
   \item Generate Teacher network of Depth N
 \end{itemize}
@@ -62,6 +62,40 @@ This protocol empirically demonstrates that gradient‐based optimization favour
   \item Deep \emph{linear} network: \(\Wprod\)
   \item Depth \(N\ge2\); the model is overparameterized for any \(N\ge2\).
 \end{itemize}
+
+%------------------------------------------------------------
+% Low–rank \texttt{teacher} matrix of dimension 100
+%------------------------------------------------------------
+\paragraph{Step 1: Orthonormal bases.}
+Generate two random orthonormal matrices
+\[
+  U,\,V \;\in\; \mathbb{R}^{100\times r}.
+\]
+Only their first \(r\) columns matter, so obtain them efficiently via a
+\emph{thin} QR decomposition applied to two independent \(100\times r\)
+standard-normal matrices.
+
+\paragraph{Step 2: Singular values.}
+Create a length-\(r\) vector \(\boldsymbol{\sigma}\), for example, with exponentially
+decaying entries (but can make other choices)
+\[
+  \sigma_i \;=\; 10 \cdot 0.5^{\,i-1},
+  \qquad i = 1,\dots,r,
+\]
+ensuring clear separation of spectral modes.
+
+\paragraph{Step 3: Assemble the matrix.}
+Define
+\[
+  W_{\text{teacher}}
+  \;=\;
+  U \,\mathrm{diag}(\boldsymbol{\sigma})\, V^{\top}.
+\]
+Because both \(U\) and \(V\) have orthonormal columns of length \(r\),
+the product has
+\[
+  \operatorname{rank}\bigl(W_{\text{teacher}}\bigr) \;=\; r.
+\]
 
 % --------------------------------------------------
 \subsubsection*{Initialization (Saddle–to–Saddle Regime)}
@@ -84,8 +118,8 @@ This protocol empirically demonstrates that gradient‐based optimization favour
         \(\Wi^{(t+1)} = \Wi^{(t)} - \eta\,\pdv{\mathcal{L}}{\Wi}\),
         \(\eta \in \{10^{-4}, 10^{-3}, 10^{-2}\}\).
   \item \textbf{Gradient Flow (GF):}\quad
-        \(\dv{\Wi}{t} = -\,\pdv{\mathcal{L}}{\Wi}\);
-        approximate with GD using smaller \(\eta_{\text{flow}}\). Use Runge-Kutta 4th order method to approximate the flow.
+        \(\Delta{\Wi}{t} = -dt\,\pdv{\mathcal{L}}{\Wi}\);
+        approximate with GD using smaller dt than \(\eta\). Use Runge-Kutta 4th order method to approximate the flow.
 \end{itemize}
 
 % --------------------------------------------------
@@ -104,6 +138,7 @@ Let $\norm{W}_*$ be the nuclear norm of $W$ (sum of singular values) and $\norm{
   \item Layer ranks \(r(\Wi)\), product rank \(r(\Wprod)\).
   \item Singular values of \(\Wprod\).
   \item Training loss \(\mathcal{L}\).
+  \item Rank of the updated weights (\(\Delta{\Wi}\)) over time.
   \item Alignment of learned vs.\ teacher singular vectors (i.e. their angles, scalar product)
 \end{itemize}
 
@@ -111,7 +146,7 @@ Let $\norm{W}_*$ be the nuclear norm of $W$ (sum of singular values) and $\norm{
 \subsubsection*{Experimental Procedure}
 
 \begin{enumerate}[nosep]
-  \item Initialize network per Section~\ref{sec:init}.
+  \item Initialize network at saddle-to-saddle regime.
   \item For example, train for \num{10\,000}–\num{50\,000} iterations (until convergence). \textbf{Important: also use iterations instead of epochs to show the incremental dynamics.}
   \item Log metrics every 10–50 iterations; save checkpoints every 1000 iterations.
 \end{enumerate}
@@ -134,6 +169,7 @@ Keep initialization fixed. These are examples of parameters to sweep:
   \item \textbf{Effective rank evolution:} \(r_{\mathrm{eff}}(\Wprod)\) vs.\ iteration/\(t\).
   \item \textbf{Singular value dynamics:} log–linear plot of all \(\sigma_i(t)\).
   \item \textbf{Layer‐wise rank:} subplots of each \(r(\Wi)\) over time.
+  \item Also plot rank of the updated weights (\(\Delta{\Wi}\)) over time.
   \item \textbf{Loss convergence:} \(\mathcal{L}\) vs.\ iteration (log scale).
 \end{enumerate}
 
