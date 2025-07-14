@@ -43,7 +43,16 @@ To address these shortcomings, we propose investigating refined SDE models of SG
 \item \textbf{Fractional Time Fokker-Planck Derivative}: Describes the subdiffusive behavior of SGD (see \href{https://arxiv.org/abs/2503.22478}{Max Hennick's paper on fractal dynamics}).
 \item \textbf{Variant of SGD with momentum and RMSprop (e.g. ADAM)}: Adam optimizers are used in LLMs training, not SGD. Langevin must be modified into an underdamped dynamics with momentum (only take momentum into account). 
 \end{itemize}
-
+\subsection*{Some key questions}
+Another perspective here is what are the key guiding questions of our investigation? Mirroring the implicit biases of gradient descent, we want to understand:
+\begin{itemize}
+\item Under what conditions using Bayesian inference as a model of training dynamics is valid?
+\item Under what conditions can we use the continuous time limit of GD as a model of training dynamics?
+\item When is taking into account the noise anisotropy important?
+\item When do we need to take into account the heavy-tailed noise?
+\item When is the SDE persepctive on training dynamics useful, in particular when does it makes sense to look at the stationary or quasi-stationary distribution?
+\item How much does it matter that we consider GD, SGD, ADAM, RMSprop etc?
+\end{itemize}
 \subsection*{Connection to AI safety}
 Another important direction would be to connect the study of the inductive biases of SGD with AI alignment. In  particular, we want to get a clearer idea of what theoretical results would be particularly useful for scalable oversight (e.g. debate) or other safety agendas (e.g. ARC, interpretability). At the moment there are some broad directions that seem promising but I want to get a clearer picture of the safety relevance and time sensitivity of applications to AI alignment.
 \begin{itemize}
@@ -58,7 +67,12 @@ In terms of the theory of change there are two important failure modes to avoid 
 \item Doing work that is fundamental but difficult to relate to alignment for the next couple of years and that is better suited to academics already working on theory of deep learning.
 \end{itemize}
 
-\section{Implicit Biases of Gradient Descent}
+\section{Gradient descent and Bayesian inference}
+It is particularly interesting to figure out the differences between gradient descent and Bayesian inference on high dimensional degenerate loss landscapes. 
+
+
+\section{Gradient Descent}
+\subsection*{Continuous limit}
 Consider a neural network $f(\theta; x,y)$ with parameters $\theta \in \mathbb{R}^d$ and an empirical loss function $L(\theta)$. Let the gradient of the loss be given by $g = -\nabla_{\theta} L(\theta)$. Gradient descent is given by the following update rule:
 \begin{equation}
 \theta_{k+1} = \theta_k - \eta_k g(\theta_k)
@@ -67,11 +81,43 @@ where $\eta_k$ is the adaptive learning rate. For theoretical analyses, it is of
 \begin{equation}
 d{\theta}(t) = - g(\theta(t)) dt
 \end{equation}
-\\
-\\
-The implicit biases of gradient descent have emerged as a fundamental topic in understanding why overparameterized neural networks generalize well despite classical learning theory predictions. This literature review examines the key theoretical advances in characterizing these implicit biases, particularly focusing on recent developments from 2020-2025.
+Consider the Taylor expansion of the parameter $\theta$ at time $t+\Delta t$ around time $t$:
+\begin{equation}
+\theta(t+\Delta t) = \theta(t) + \dot{\theta}(t) \Delta t + \frac{1}{2} \ddot{\theta}(t) \Delta t^2 + O(\Delta t^3)
+\end{equation}
+Recall that:
+\begin{equation}
+\dot{\theta}(t) = - g(\theta(t))
+\end{equation}
+\begin{equation}
+\ddot{\theta}_i(t) = - \dot{\theta}(t)_j \partial_j \partial_i L(\theta(t)) = \partial_{ij} L(\theta(t)) \partial_j L(\theta(t))
+\end{equation}
+Where the latter equation holds if the loss is $\mathcal{C}^2$. In that case we have:
+\begin{equation}
+      \ddot{\theta}(t) =  H(\theta(t)) g(\theta(t))
+\end{equation}
+Where $H(\theta(t))$ is the Hessian of the loss. Assume that $\Delta t = \eta$. Then we have:
+\begin{equation}
+\theta(t+\eta) = \theta(t) - \eta g(\theta(t)) + \frac{1}{2} \eta^2 H(\theta(t)) g(\theta(t)) + O(\eta^3)
+\end{equation}
+Assuming that we have $\eta||Hg(\theta)|| << 2||g(\theta)||$ then the continuous limit of GD holds. Consider the spectral norm induced by the vector 2-norm i.e.:
 
-\subsection{Low-Rank Bias in Deep Linear Networks}
+\begin{equation}
+||H(\theta)||_2 = \sup_{x \neq 0} \frac{||H(\theta)x||}{||x||} = \sigma_{\max}(H(\theta))
+\end{equation}
+Where $\sigma_{\max}(H(\theta))$ is the largest singular value of $H(\theta)$.
+We have the following inequality:
+\begin{equation}
+||H(\theta)g(\theta)||_2 \leq ||H(\theta)||_2 ||g(\theta)||_2
+\end{equation}
+Therefore we have:
+\begin{equation}
+||H(\theta)g(\theta)|| \leq \sigma_{\max}(H(\theta)) ||g(\theta)||
+\end{equation}
+Hence, if $\sigma_{\max} << \frac{2}{\eta}$ then the continuous limit of GD is a valid approximation. Unfortunately, this assumption seems to be violated in practice since it has been observed that GD typically operates at the edge of stability \footnote{But it might be the case that Gradient flow still converges to good solutions? Or perhaps by studying the second order approximation of GD into the flow things work out?}.
+\subsection*{Implicit Biases of Gradient Descent}
+The implicit biases of gradient descent have emerged as a fundamental topic in understanding why overparameterized neural networks generalize well despite classical learning theory predictions. This literature review examines the key theoretical advances in characterizing these implicit biases, particularly focusing on recent developments from 2020-2025.
+\subsubsection{Low-Rank Bias in Deep Linear Networks}
 
 The low-rank bias represents one of the most mathematically well-characterized implicit regularization effects in deep learning. For a deep linear network with weight matrices $W_1, W_2, \ldots, W_L$, the learned representation $W = W_1 W_2 \cdots W_L$ exhibits significantly lower effective rank than the ambient dimension would suggest.
 
@@ -81,7 +127,7 @@ The nuclear norm minimization conjecture, initially proposed by \citet{gunasekar
 
 Recent work by \citet{chou2024gradient} provided rigorous dynamical analysis characterizing how the effective rank evolves during training in a distinctive ``waterfall'' pattern, where different eigenvalues converge at different rates. Their analysis reveals that deeper networks exhibit stronger low-rank bias, with the bias strength depending critically on initialization scale and network depth.
 
-\subsection{Edge of Stability Phenomenon}
+\subsubsection{Edge of Stability Phenomenon}
 
 The edge of stability (EoS) phenomenon, discovered by \citet{cohen2021gradient}, represents a paradigm shift in understanding neural network optimization. During training, the sharpness (largest eigenvalue of the loss Hessian) progressively increases until reaching approximately $2/\eta$, where $\eta$ is the learning rate, then hovers at this critical threshold while loss continues decreasing.
 
@@ -91,7 +137,7 @@ The edge of stability (EoS) phenomenon, discovered by \citet{cohen2021gradient},
 
 \citet{song2023trajectory} extended the theoretical understanding through bifurcation theory, proving that different gradient descent trajectories align on specific bifurcation diagrams independent of initialization. This trajectory alignment provides rigorous mathematical foundations for both progressive sharpening and EoS phenomena. Recent extensions to stochastic settings reveal that SGD operates in ``Edge of Stochastic Stability,'' where batch sharpness rather than full-batch sharpness stabilizes at $2/\eta$.
 
-\subsubsection{Milestones: explicit EoS studies in DLNs}
+\paragraph{Milestones: explicit EoS studies in DLNs}
 
 \textbf{2022 - Two-layer linear net} \citep{Li2022SharpnessEoS}: Four-phase trajectory showing progressive sharpening, EoS oscillation, then eventual monotone descent.
 
@@ -114,7 +160,7 @@ captured the ``progressive sharpening'' of singular values in DLNs, but
 did not frame it in EoS terms.
 
 % --------------------------------------------------
-\subsubsection{Insights distilled from the linear literature}
+\paragraph{Insights distilled from the linear literature}
 
 \begin{itemize}
 \item \textbf{Sharpness self-regulation.}  Exact or bounded spectra show
@@ -139,7 +185,7 @@ did not frame it in EoS terms.
 \end{itemize}
 
 % --------------------------------------------------
-\subsubsection{Open directions}
+\paragraph{Open directions}
 
 \begin{enumerate}
 \item Extending proofs to \emph{non-square} or convolutional linear
@@ -157,7 +203,7 @@ they have become the canonical sandbox for explaining why sharpness
 hovers near $2/\eta$, how oscillations arise, and what this implies for
 implicit regularisation.
 
-\subsection{Additional Implicit Biases}
+\subsubsection*{Additional Implicit Biases}
 
 Beyond low-rank bias and edge of stability, neural networks exhibit multiple implicit biases that collectively shape learned representations.
 
@@ -173,7 +219,7 @@ Beyond low-rank bias and edge of stability, neural networks exhibit multiple imp
 \subsubsection{Sparsity Bias}
 \citet{woodworth2020kernel} showed that for diagonal networks, initialization scale controls implicit bias: as initialization scale $\alpha \to 0$, the implicit regularizer approaches $R(w) = \|w\|_1$, while $\alpha \to \infty$ gives $R(w) = \|w\|_2^2$, creating automatic feature selection without explicit regularization.
 
-\subsection{Discrete versus Continuous Optimization}
+\subsubsection{Discrete versus Continuous Optimization}
 
 The relationship between gradient descent (discrete updates) and gradient flow (continuous time limit) reveals important distinctions in implicit bias. While gradient flow provides clean theoretical analysis, finite step sizes introduce discretization effects that can significantly alter implicit biases.
 
@@ -181,7 +227,7 @@ For linear models, both formulations generally converge to similar solutions -- 
 
 In neural networks, the differences become more pronounced. Homogeneous networks with favorable curvature properties along gradient flow trajectories allow discrete gradient descent to closely approximate continuous flow. However, finite step sizes can induce different implicit biases, particularly in stochastic variants where different eigenvalue directions are explored \citep{mulayoff2021continuous}.
 
-\subsection{Recent Theoretical Advances (2020-2025)}
+\subsubsection{Recent Theoretical Advances (2020-2025)}
 
 The period 2020-2025 has witnessed several breakthrough theoretical advances. The discovery of Edge of Stability fundamentally changed understanding of neural network optimization, revealing that large learning rates create beneficial implicit bias toward flatter minima through self-stabilization mechanisms.
 
