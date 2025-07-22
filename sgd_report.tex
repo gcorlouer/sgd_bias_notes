@@ -67,38 +67,86 @@ In terms of the theory of change there are two important failure modes to avoid 
 \item Doing work that is fundamental but difficult to relate to alignment for the next couple of years and that is better suited to academics already working on theory of deep learning.
 \end{itemize}
 
-\section{Gradient descent and Bayesian inference}
+\section{Setup and mystery of deep learning}
+What to introduce:
+- The problem of learning a function from data
+- Dataset, input, output, i.i.d assumption
+- Population loss, empirical loss, generalization error
+- Want to do argmin of the loss function. 
+- Learning as finding hypothesis that minimize the population loss and empirical loss
+- Bound over generalization error
+- Neural networks as a particular function class
+- Naive complexity bounds suggest that learning should be very difficult (curse of dimensionality)
+- In general not possible because argmin is intractable?
+- Instead we do some local search, A typical choice is using GD.
+- Neural networks are successful in practice. There is some implicit regularization at play during training. Understanding training dynamics to make this implicit regularization explicit is key. 
+- We know from SLT that degeneracies play an important role: implicit model selection during Bayesian inference with LLC as complexity measure. Give tighter bounds on generalization.
+\\
+\\
+Let $D_m = {((X_i, Y_i))_{i=1}^m}$ be a dataset of $m$ i.i.d. samples from some unknown distribution $P$. Let $f: \mathcal{X} \to \mathcal{Y}$ be a function. A generic problem in (supervised) machine learning is to learn a function $h$ in a set of hypotheses class $\mathcal{H}$ that best approximates $f$. More specifically, we want to find a function $h$ in $\mathcal{H}$ that minimizes the population loss \footnote{For simplicity of the exposition we consider the mean squared error loss}:
+\begin{equation}
+L(h) := \mathbb{E}_{(X,Y) \sim P} [||Y - h(X)||_2]
+\end{equation}
+The population loss is the expected loss over the unknown distribution $P$. In practice, the learner does not have access to the unknown distribution $P$ but only to a finite dataset $D_m$. Instead of minimizing the population loss, the learner minimizes the empirical loss which is the average error over the dataset $D_m$:
+\begin{equation}
+L_m(h; D_m) = \frac{1}{m} \sum_{i=1}^m ||y_i - h(x_i)||_2
+\end{equation}
+The law of large numbers ensures that the empirical loss converges to the population loss as the number of samples $m$ goes to infinity. In other words, in the limit of large samples the empirical can be used to approximate the population loss. The problem of approximating the function $f$ is framed as an optimization problem over a set of hypotheses $\mathcal{H}$ given some data $D_m$. More specifically, for a sufficiently large number of samples $m$ we want to find:
+\begin{equation}
+h^* = \arg\min_{h \in \mathcal{H}} L_m(h; D_m)
+\end{equation}
+Define the generalization error as the difference between the population loss and the empirical loss:
+\begin{equation}
+\Delta_m(h) = L(h) - L_m(h; D_m)
+\end{equation}
+A typical upper bound of the generalization error $\Delta_m(h)$ with probability $1-\delta$ is given by:
+\begin{equation}
+\Delta_m(h) \leq \frac{\chi(\mathcal{H}) + O(\log(1/\delta))}{m}
+\end{equation}
+If $m >> \chi(\mathcal{H})$ then the generalization error is small with high probability. In the context of deep learning, the number of parameters is typically of the same order as the number of samples or more (the overparametrized regime). Complexity measures such as VC dimension which approximately corresponds to the number of parameters suggest a high generalization error which contradicts empirical evidence that deep learning models can generalize well. This indicates that deep learning models have some implicit bias that enables them to find solution with low effective complexity inducing small generalization error.
+\\
+\\
+- SLT tells us that the generalization error is given by the LLC. The LLC is an effective measure of complexity that is much lower than the VC dimension. SLT applies to degenerate Bayesian models. This indicates that degeneracies are important. Bayesian learning is difficult in practice. Practictioners use SGD. How it does it, how specific function that generalize well are learned is still a mystery. SGD performs well on non-convex high dimensional loss landscapes. Mention Zhang's paper. SGD, the learning algorithm of DeepLearning must do some implicit model selection that enables it to find solutions with low effective complexity (and this implicit model selection presumably differs from Bayesian inference).
+- Present Deep Linear Networks (DLN) as a setup that we use throughout the survey.
+\section{Langevin dynamics}
 It is particularly interesting to figure out the differences between gradient descent and Bayesian inference on high dimensional degenerate loss landscapes. 
 
 
 \section{Gradient Descent}
-\subsection*{Continuous limit}
-Consider a neural network $f(\theta; x,y)$ with parameters $\theta \in \mathbb{R}^d$ and an empirical loss function $L(\theta)$. Let the gradient of the loss be given by $g = -\nabla_{\theta} L(\theta)$. Gradient descent is given by the following update rule:
+Gradient descent is the simplest first order optimization method that was used in DL. To start simple, we look at the implicit biases of GD. 
+\subsection*{Continuous limit of GD to gradient flow (GF)}
+Consider a neural network $h(\theta; x,y)$ with parameters $\theta \in \mathbb{R}^d$ and an empirical loss function $L(\theta)$. Let the gradient of the loss be given by $g(\theta) = -\nabla_{\theta} L(\theta)$. Given some initialization $\theta_0 \sim N(0, \sigma_d^2)$, Gradient Descent is given by the following update rule:
 \begin{equation}
 \theta_{k+1} = \theta_k - \eta_k g(\theta_k)
 \end{equation}
-where $\eta_k$ is the adaptive learning rate. For theoretical analyses, it is often useful to consider the gradient flow (GF) which is the continuous time limit of gradient descent. Consider that GD is a discretisation of a continuous flow with discrete time steps $t = k\eta$ and let $\eta \to 0$ while being independent of $k$, then we can write the GF equation:
+where $\eta_k$ is the learning rate with a schedule indexed by $k$. For theoretical analyses, it is often useful to consider the gradient flow (GF) which is the continuous time limit of gradient descent. We consider that GD is a discretisation of a continuous flow with discrete time steps $t = k\eta$ and let $\eta \to 0$ while being independent of $k$, then we can write the GF equation:
 \begin{equation}
-d{\theta}(t) = - g(\theta(t)) dt
+      \dot{\theta} := \frac{d\theta}{dt} = - g(\theta, t)
 \end{equation}
+- Under what conditions GD continuous limit holds?
+- Under which conditions GD is stable?
+- Under what conditions GF converges?
+- Convergence properties of GD vs GF
+\\
+\subsection*{Sufficient condition for GD continuous limit to the GF}
 Consider the Taylor expansion of the parameter $\theta$ at time $t+\Delta t$ around time $t$:
 \begin{equation}
 \theta(t+\Delta t) = \theta(t) + \dot{\theta}(t) \Delta t + \frac{1}{2} \ddot{\theta}(t) \Delta t^2 + O(\Delta t^3)
 \end{equation}
-Recall that:
+We use the physicist convention of repeated indices summation. Recall that:
 \begin{equation}
-\dot{\theta}(t) = - g(\theta(t))
+\dot{\theta}(t) = - g(\theta, t)
 \end{equation}
 \begin{equation}
-\ddot{\theta}_i(t) = - \dot{\theta}(t)_j \partial_j \partial_i L(\theta(t)) = \partial_{ij} L(\theta(t)) \partial_j L(\theta(t))
+\ddot{\theta}_i(t) = - \dot{\theta}(t)_j \partial_j \partial_i L(\theta, t) = \partial_{ij} L(\theta, t) \partial_j L(\theta, t)
 \end{equation}
 Where the latter equation holds if the loss is $\mathcal{C}^2$. In that case we have:
 \begin{equation}
-      \ddot{\theta}(t) =  H(\theta(t)) g(\theta(t))
+      \ddot{\theta}(t) =  H(\theta, t) g(\theta, t)
 \end{equation}
-Where $H(\theta(t))$ is the Hessian of the loss. Assume that $\Delta t = \eta$. Then we have:
+Where $H$ is the Hessian of the loss. Assume that $\Delta t = \eta$. Then we have:
 \begin{equation}
-\theta(t+\eta) = \theta(t) - \eta g(\theta(t)) + \frac{1}{2} \eta^2 H(\theta(t)) g(\theta(t)) + O(\eta^3)
+\theta(t+\eta) = \theta(t) - \eta g(\theta, t) + \frac{1}{2} \eta^2 H(\theta, t) g(\theta, t) + O(\eta^3)
 \end{equation}
 Assuming that we have $\eta||Hg(\theta)|| << 2||g(\theta)||$ then the continuous limit of GD holds. Consider the spectral norm induced by the vector 2-norm i.e.:
 
@@ -114,7 +162,50 @@ Therefore we have:
 \begin{equation}
 ||H(\theta)g(\theta)|| \leq \sigma_{\max}(H(\theta)) ||g(\theta)||
 \end{equation}
-Hence, if $\sigma_{\max} << \frac{2}{\eta}$ then the continuous limit of GD is a valid approximation. Unfortunately, this assumption seems to be violated in practice since it has been observed that GD typically operates at the edge of stability \footnote{But it might be the case that Gradient flow still converges to good solutions? Or perhaps by studying the second order approximation of GD into the flow things work out?}.
+Hence, if $\sigma_{\max} << \frac{2}{\eta}$ then the continuous limit of GD is a valid approximation. Unfortunately, this assumption seems to be violated in practice since it has been observed that GD typically operates at the edge of stability in CIFAR-10 NN\footnote{But it might be the case that Gradient flow still converges to good solutions? Or perhaps by studying the second order approximation of GD into the flow things work out? Also not clear if it applies to SGD}. We compared the behavior of the losses for GD and GF in DLNs. \textbf{Show experiments here.}
+\subsection*{Stability of GD}
+- Descent lemma:
+Need to explain as this is the classical picture of stability of GD. Descent lemma gives condition for loss to decrease monotonically. Pb is that with edge of stability this condition is violated but we still observe monotonic loss decrease.
+
+\subsection*{Edge of Stability}
+The Descent lemma gives sufficient condition-the stability condition-for the loss to decrease monotonically. However, it has been observed that deep neural networks, operate at the edge of stability. More specifically, the edge of stability regime follows a phase of progressive sharpening where the sharpness $S(\theta)$ increases monotonically until it reaches the threshold $\frac{2}{\eta}$ and oscillates around that threshold (edge of stability regime).\textbf{Insert figure 1 from \href{https://par.nsf.gov/servlets/purl/10416371}{EoS paper}} This shows that GD has an implicit bias induced by the learning rate which regularizes region of the loss landscape whose sharpness is larger than the stability threshold. Mathematically, EoS shows that GD implicitly solving a constrained optimization problem where it minimizes the Loss $L(\theta)$ under the constraint $S(\theta) \leq \frac{2}{\eta}$. We observed this effect in Deep Linear Networks. \textbf{Show experiments here.} 
+\\
+\\
+We can decompose the GD training dynamics into four phases: a first phase of progressive sharpening, a second phase in which the dynamics blows up along an unstable direction, a third phase of self-stabilization and a fourth phase of returning to stability. Following \cite{damian2022self} we will present a heuristic derivation showing the four phases of GD. We will assume that only one direction $u$ becomes unstable during the dynamics. Let $\theta^{\star}$ be the point at which the dynamics becomes unstable i.e. the maximum eigenvalue of the Hessian is equal to $\frac{2}{\eta}$. We will assume that only one direction $u:=u(\theta^{\star})$ becomes unstable during the dynamics. We are interested in the change in sharpness:
+\begin{equation}
+      S(\theta_{t+1}) - S(\theta_t) = \langle\nabla S(\theta_t),(\theta_{t+1} - \theta_t)\rangle = - \eta \langle\nabla S(\theta_t),g(\theta_t)\rangle
+\end{equation}
+Let $y_t := \langle\nabla S(\theta^{\star}),(\theta_{t+1} - \theta_t)\rangle$. Far from the unstable point $\theta^{\star}$ in the stable regime, we have $S(\theta_{t}) \leq S(\theta_{t+1})$ i.e gradient of loss and sharpness point in opposite directions. Let us Taylor expand the gradient of the loss around $\theta^{\star}$:
+\begin{equation}
+      g_i(\theta_{t}) = g_i(\theta^{\star}) + \partial_{ij} L(\theta^{\star})(\theta_j - \theta_j^{\star}) + \frac{1}{2} \partial_{ijk} L(\theta^{\star})(\theta_j - \theta_j^{\star})(\theta_k - \theta_k^{\star}) + O((\theta_j - \theta_j^{\star})^3)
+\end{equation}
+One can show that along some stable direction $v$, when the sharpness is smaller than $\frac{2}{\eta}$ we have:
+
+Hence we can restrict the study of the dynamics along the unstable direction $u$. 
+
+
+
+
+
+
+
+\subsection*{Principal Flow and Central flow}
+
+
+\subsection*{Gradient flow over effective potential}
+Note that we have the following relation (using symmetry of the Hessian):
+\begin{equation}
+\nabla^2 L(\theta).\nabla L(\theta) = \frac{1}{2} \nabla (\nabla L(\theta)^T \nabla L(\theta)) 
+\end{equation}
+Which leads to the following gradient flow (\textbf{Comment: Sign mistake?}):
+\begin{equation}
+      \dot{\theta} = - \nabla (L(\theta) -\frac{1}{4} \eta \nabla L(\theta)^T \nabla L(\theta)) = \nabla (L(\theta) -\frac{1}{4} \eta ||\nabla L(\theta)||^2) = - \nabla \tilde{L}(\theta)
+\end{equation}
+Where $$\tilde{L}(\theta) = L(\theta) -\frac{1}{4} \eta ||\nabla L(\theta)||^2$$ In other words, the second order term correction can be incorporated into the gradient flow as an implicit regularization of the loss. This regularization encourage larger gradients i.e. moving toward sharper regions of the loss landscape, which is consistent with observations made on the edge of stability. This regularization was introduced by \citet{barrett2020implicit}. Unfortunately, this second order development is not sufficient to explain the edge of stability phenomena. Note: perhaps we need to go to higher order term to understand the full edge of stability phenomena.
+\subsection*{Modes and low rank bias in DLNs}
+
+\subsection*{Modes during EoS}
+Discuss chaotic behavior of modes during EoS in that paper \href{https://openreview.net/pdf?id=J4Dvxv7WnG}{here}. EoS can break conservation laws during GF (but that's ok if we can use effective potential).
 \subsection*{Implicit Biases of Gradient Descent}
 The implicit biases of gradient descent have emerged as a fundamental topic in understanding why overparameterized neural networks generalize well despite classical learning theory predictions. This literature review examines the key theoretical advances in characterizing these implicit biases, particularly focusing on recent developments from 2020-2025.
 \subsubsection{Low-Rank Bias in Deep Linear Networks}
